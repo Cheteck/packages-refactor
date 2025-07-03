@@ -83,10 +83,10 @@ return [
     |
     | Specify the User model class to be used by the package for relationships
     | if it needs to interact with Users directly (beyond Spatie's handling).
-    | Defaults to Laravel's base User model.
+    | This will now default to the model specified in the UserManagement package's config.
     |
     */
-    'user_model' => \App\Models\User::class,
+    'user_model' => config('user-management.model', \App\Models\User::class),
 
     /*
     |--------------------------------------------------------------------------

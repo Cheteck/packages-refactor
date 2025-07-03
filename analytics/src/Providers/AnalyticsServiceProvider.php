@@ -9,7 +9,7 @@ class AnalyticsServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../Config/analytics.php', 'analytics'
+            __DIR__.'/../../config/analytics.php', 'analytics'
         );
     }
 
@@ -20,7 +20,7 @@ class AnalyticsServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../Config/analytics.php' => config_path('analytics.php'),
+                __DIR__.'/../../config/analytics.php' => config_path('analytics.php'),
             ], 'config'); // Use standard 'config' tag
 
             $this->publishes([

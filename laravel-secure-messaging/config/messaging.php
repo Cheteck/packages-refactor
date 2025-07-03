@@ -8,9 +8,10 @@ return [
     |
     | This is the Eloquent model that should be used to represent users.
     | It will be used for relationships and authentication.
+    | This will now default to the model specified in the UserManagement package's config.
     |
     */
-    'user_model' => \App\Models\User::class,
+    'user_model' => config('user-management.model', \App\Models\User::class),
 
     /*
     |--------------------------------------------------------------------------

@@ -18,7 +18,7 @@ class InventoryServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../Config/inventory.php', 'inventory'
+            __DIR__.'/../../config/inventory.php', 'inventory'
         );
     }
 
@@ -26,9 +26,11 @@ class InventoryServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../Database/migrations');
 
-        $this->publishes([
-            __DIR__.'/../Config/inventory.php' => config_path('inventory.php'),
-        ], 'inventory-config');
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../../config/inventory.php' => config_path('inventory.php'),
+            ], 'config'); // Standardized tag to 'config'
+        }
 
         $this->registerEventListeners();
     }

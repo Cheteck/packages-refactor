@@ -15,7 +15,7 @@ use IJIDeals\Social\Traits\HasComments;
 use IJIDeals\Social\Traits\HasReaction;
 use IJIDeals\Social\Traits\HasReports;
 use IJIDeals\Social\Traits\HasShares;
-use IJIDeals\UserManagement\Models\User;
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
 use Illuminate\Database\Eloquent\Builder;
 // Assuming PostAnalytics, Hashtag are in the same namespace or imported correctly.
 // If not, their FQCN or imports would be needed for the property type hints.
@@ -394,7 +394,7 @@ class Post extends Model implements HasMedia
      */
     public function mentions()
     {
-        return $this->belongsToMany(User::class, 'post_mentions'); // Now uses imported IJIDeals\UserManagement\Models\User
+        return $this->belongsToMany(config('user-management.model', \App\Models\User::class), 'post_mentions');
     }
 
     /**
@@ -484,8 +484,17 @@ class Post extends Model implements HasMedia
     /**
      * Scope pour les posts visibles par un utilisateur spécifique
      */
-    public function scopeVisibleTo($query, User $user) // Now uses imported IJIDeals\UserManagement\Models\User
+    public function scopeVisibleTo($query, /* User */ $user) // Type hint will use configured model
     {
+        // Ensure $user is an instance of the configured user model.
+        // This might require resolving the model class from config first if strict type hinting is desired
+        // For now, relying on duck typing or ensuring $user is passed correctly.
+        $userModelClass = config('user-management.model', \App\Models\User::class);
+        if (! $user instanceof $userModelClass) {
+            // Optionally log a warning or throw an error if type is strictly enforced
+            // For now, proceed assuming $user is compatible.
+        }
+
         return $query->where(function ($q) use ($user) {
             $q->where('visibility', VisibilityType::PUBLIC)
                 ->orWhere(function ($q) use ($user) {
@@ -796,7 +805,7 @@ class Post extends Model implements HasMedia
 
     public function bookmarks()
     {
-        return $this->belongsToMany(User::class, 'bookmarks'); // Now uses imported IJIDeals\UserManagement\Models\User
+        return $this->belongsToMany(config('user-management.model', \App\Models\User::class), 'bookmarks');
     }
 
     /**
@@ -848,8 +857,8 @@ class Post extends Model implements HasMedia
         \Illuminate\Support\Facades\Log::info("Usernames found by regex for post {$this->id}: " . implode(', ', $usernames));
 
         // Assuming User model has a 'username' field. If not, adjust the query.
-        // Also, ensure the User model is correctly imported (IJIDeals\UserManagement\Models\User).
-        $users = User::whereIn('username', $usernames)->get()->all(); // Return as a plain array
+        $userModelClass = config('user-management.model', \App\Models\User::class);
+        $users = app($userModelClass)->whereIn('username', $usernames)->get()->all(); // Return as a plain array
 
         \Illuminate\Support\Facades\Log::info("Users fetched from DB for post {$this->id}: " . count($users) . " users.");
 

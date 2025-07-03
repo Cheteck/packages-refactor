@@ -2,123 +2,146 @@
 
 namespace IJIDeals\IJIProductCatalog\Http\Controllers\Shop;
 
-use Illuminate\Http\Request;
+use Illuminate\Http\Request; // Keep for index, show
 use Illuminate\Routing\Controller;
 use IJIDeals\IJIProductCatalog\Models\ProductProposal;
 use IJIDeals\IJICommerce\Models\Shop; // Shop model remains in IJICommerce
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rule; // No longer needed here
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use IJIDeals\IJIProductCatalog\Http\Requests\Shop\StoreShopProductProposalRequest;
 
+/**
+ * Shop-facing controller for managing Product Proposals.
+ * Allows authenticated users (shop owners/managers) to submit new product proposals
+ * to the platform catalog and view their existing proposals.
+ */
 class ProductProposalController extends Controller
 {
     public function __construct()
     {
-        // Apply middleware that ensures user is authenticated for all proposal actions.
-        // Specific shop team membership/role checks will be done via policies or direct checks.
-        // $this->middleware('auth:sanctum'); // Assuming Sanctum, applied at route level for more flexibility
+        // $this->middleware('auth:sanctum'); // Applied at route level
+        // Log::debug('Shop ProductProposalController constructed.');
     }
 
     /**
-     * Display a listing of the product proposals for the current user's shop(s).
+     * Display a listing of product proposals submitted by shops managed by the authenticated user.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
-        Log::info('Shop ProductProposalController: Fetching product proposals.', ['user_id' => Auth::id()]);
         $user = $request->user();
+        $userId = $user ? $user->id : null;
+        Log::debug('Shop ProductProposalController@index: Fetching product proposals.', ['user_id' => $userId, 'query_params' => $request->query()]);
+
+        if (!$user) {
+            Log::warning('Shop ProductProposalController@index: Unauthenticated access attempt.');
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
 
         $teamForeignKey = config('permission.column_names.team_foreign_key', 'team_id');
         $modelHasRolesTable = config('permission.table_names.model_has_roles', 'model_has_roles');
+        $rolesToManageProposals = config('ijiproductcatalog.shop_proposal_management_roles', ['Owner', 'Administrator']);
 
         $manageableShopIds = DB::table($modelHasRolesTable)
             ->join('roles', "{$modelHasRolesTable}.role_id", '=', 'roles.id')
             ->where('model_type', $user->getMorphClass())
             ->where('model_id', $user->getKey())
-            ->whereIn('roles.name', ['Owner', 'Administrator']) // TODO: Make these roles configurable or check permission
+            ->whereIn('roles.name', $rolesToManageProposals)
             ->whereNotNull($teamForeignKey)
             ->distinct()
             ->pluck($teamForeignKey);
 
         if ($manageableShopIds->isEmpty()) {
-            Log::info('Shop ProductProposalController: User has no manageable shops for proposals.', ['user_id' => Auth::id()]);
+            Log::info('Shop ProductProposalController@index: User has no manageable shops for proposals or lacks required role.', ['user_id' => $userId, 'roles_checked' => $rolesToManageProposals]);
             return response()->json(['data' => [], 'message' => 'You do not manage any shops or have permission to view proposals.'], 200);
         }
+        Log::debug('Shop ProductProposalController@index: User manages shops.', ['user_id' => $userId, 'shop_ids' => $manageableShopIds->toArray()]);
 
         $proposals = ProductProposal::whereIn('shop_id', $manageableShopIds)
             ->with('shop:id,name')
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->orderByDesc('created_at')
+            ->paginate(config('ijiproductcatalog.pagination.shop_proposals', 15));
 
-        Log::info('Shop ProductProposalController: Product proposals fetched successfully.', ['user_id' => Auth::id(), 'count' => $proposals->count()]);
+        Log::info('Shop ProductProposalController@index: Product proposals fetched successfully.', ['user_id' => $userId, 'count' => $proposals->count(), 'total' => $proposals->total()]);
         return response()->json($proposals);
     }
 
     /**
-     * Store a newly created product proposal in storage.
+     * Store a newly created Product Proposal from a shop.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \IJIDeals\IJIProductCatalog\Http\Requests\Shop\StoreShopProductProposalRequest  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function store(StoreShopProductProposalRequest $request)
     {
-        Log::info('Shop ProductProposalController: Attempting to store new product proposal.', ['user_id' => Auth::id(), 'request_data' => $request->all()]);
         $user = $request->user();
-        $validated = $request->validate([
-            'shop_id' => [
-                'required',
-                Rule::exists(config('ijicommerce.tables.shops', 'shops'), 'id')
-            ],
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:5000',
-            'proposed_brand_name' => 'nullable|string|max:255',
-            'proposed_category_name' => 'nullable|string|max:255',
-            'proposed_specifications' => 'nullable|array',
-            'proposed_images_payload' => 'nullable|array',
-        ]);
+        $userId = $user->id; // User is guaranteed by FormRequest authorize method
+        Log::debug('Shop ProductProposalController@store: Attempting to store new product proposal.', ['user_id' => $userId, 'request_data' => $request->all()]);
 
-        $shop = Shop::find($validated['shop_id']);
-        // Authorization: Check if user can create a proposal for this shop
-        if ($user->cannot('createProposal', [ProductProposal::class, $shop])) {
-            Log::warning('Shop ProductProposalController: Unauthorized attempt to create proposal for shop.', ['user_id' => Auth::id(), 'shop_id' => $shop->id]);
-            return response()->json(['message' => "You are not authorized to submit proposals for shop '{$shop->name}'."], 403);
+        // Authorization handled by StoreShopProductProposalRequest->authorize()
+        // Validation handled by StoreShopProductProposalRequest->rules()
+        $validatedData = $request->validated();
+        Log::debug('Shop ProductProposalController@store: Validation passed via FormRequest.', ['user_id' => $userId, 'validated_data' => $validatedData]);
+
+        // Shop existence is validated by FormRequest Rule::exists
+        // $shop = Shop::find($validatedData['shop_id']);
+        // No need to re-find, shop_id is validated.
+
+        try {
+            $proposal = ProductProposal::create([
+                'shop_id' => $validatedData['shop_id'],
+                'name' => $validatedData['name'],
+                'description' => $validatedData['description'] ?? null,
+                'proposed_brand_name' => $validatedData['proposed_brand_name'] ?? null,
+                'proposed_category_name' => $validatedData['proposed_category_name'] ?? null,
+                'proposed_specifications' => $validatedData['proposed_specifications'] ?? [],
+                'proposed_images_payload' => $validatedData['proposed_images_payload'] ?? [],
+                'status' => 'pending',
+            ]);
+
+            Log::info('Shop ProductProposalController@store: Product proposal stored successfully.', ['user_id' => $userId, 'proposal_id' => $proposal->id, 'shop_id' => $validatedData['shop_id']]);
+            // TODO: Notify platform admins of new proposal
+            return response()->json($proposal->fresh()->load('shop:id,name'), 201);
+        } catch (\Exception $e) {
+            Log::error('Shop ProductProposalController@store: Error storing product proposal.', [
+                'user_id' => $userId,
+                'shop_id' => $validatedData['shop_id'] ?? null, // shop_id might not be set if validation failed before this point, though unlikely with FormRequest
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Error storing product proposal.'], 500);
         }
-
-        $proposal = ProductProposal::create([
-            'shop_id' => $shop->id,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'proposed_brand_name' => $validated['proposed_brand_name'] ?? null,
-            'proposed_category_name' => $validated['proposed_category_name'] ?? null,
-            'proposed_specifications' => $validated['proposed_specifications'] ?? [],
-            'proposed_images_payload' => $validated['proposed_images_payload'] ?? [],
-            'status' => 'pending',
-        ]);
-
-        Log::info('Shop ProductProposalController: Product proposal stored successfully.', ['proposal_id' => $proposal->id, 'shop_id' => $shop->id]);
-        return response()->json($proposal, 201);
     }
 
     /**
-     * Display the specified product proposal.
+     * Display the specified Product Proposal if the authenticated user is authorized to view it.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal
+     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal The ProductProposal instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
     public function show(Request $request, ProductProposal $productProposal)
     {
-        Log::info('Shop ProductProposalController: Showing product proposal details.', ['proposal_id' => $productProposal->id, 'user_id' => Auth::id()]);
-        // Authorization: Check if user can view this proposal
-        if ($request->user()->cannot('view', $productProposal)) {
-             Log::warning('Shop ProductProposalController: Unauthorized attempt to view proposal.', ['user_id' => Auth::id(), 'proposal_id' => $productProposal->id]);
+        $user = $request->user();
+        $userId = $user ? $user->id : null;
+        Log::debug('Shop ProductProposalController@show: Showing product proposal details.', ['user_id' => $userId, 'proposal_id' => $productProposal->id]);
+
+        if (!$user) {
+            Log::warning('Shop ProductProposalController@show: Unauthenticated access attempt.');
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if ($user->cannot('view', $productProposal)) {
+             Log::warning('Shop ProductProposalController@show: Authorization failed for user to view proposal.', ['user_id' => $userId, 'proposal_id' => $productProposal->id]);
              return response()->json(['message' => 'You are not authorized to view this proposal.'], 403);
         }
 
-        $productProposal->load('shop:id,name');
+        $productProposal->load('shop:id,name'); // Load only necessary shop fields
+        Log::info('Shop ProductProposalController@show: Product proposal details fetched.', ['user_id' => $userId, 'proposal_id' => $productProposal->id]);
         return response()->json($productProposal);
     }
 }

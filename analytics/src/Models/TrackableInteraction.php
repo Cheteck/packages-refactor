@@ -2,7 +2,7 @@
 
 namespace IJIDeals\Analytics\Models;
 
-use IJIDeals\UserManagement\Models\User;
+// use IJIDeals\UserManagement\Models\User; // Will use configured model
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -96,7 +96,7 @@ class TrackableInteraction extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class));
     }
 
     /**

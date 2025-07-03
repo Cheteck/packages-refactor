@@ -2,8 +2,8 @@
 
 namespace IJIDeals\Social\Models; // Changed namespace
 
-use IJIDeals\UserManagement\Models\User;
-use Illuminate\Database\Eloquent\Model; // Added use for User model
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
+use Illuminate\Database\Eloquent\Model;
 use OpenApi\Annotations as OA; // Import OpenApi namespace
 
 /**
@@ -60,11 +60,11 @@ class Friendship extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class));
     }
 
     public function friend()
     {
-        return $this->belongsTo(User::class, 'friend_id');
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class), 'friend_id');
     }
 }

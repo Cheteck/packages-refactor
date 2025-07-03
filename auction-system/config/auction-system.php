@@ -69,7 +69,7 @@ return [
     'winner_job_frequency' => 'everyMinute', // Options: everyMinute, everyFiveMinutes, etc. (see Laravel Task Scheduling)
 
     // User model (if different from default Laravel User)
-    'user_model' => config('auth.providers.users.model', \App\Models\User::class), // TODO: Change to IJIDeals User model
+    'user_model' => config('user-management.model', \App\Models\User::class),
 
     // Product model (if different from a generic one, or to specify the exact model)
     // This needs to point to the actual Product model from the commerce/ijicommerce package.

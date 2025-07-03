@@ -2,24 +2,39 @@
 
 namespace IJIDeals\IJIProductCatalog\Http\Controllers\Admin;
 
-use Illuminate\Http\Request;
+use Illuminate\Http\Request; // Keep for index, show
 use Illuminate\Routing\Controller;
 use IJIDeals\IJIProductCatalog\Models\ProductProposal;
 use IJIDeals\IJIProductCatalog\Models\MasterProduct;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rule; // No longer needed here
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use IJIDeals\IJIProductCatalog\Http\Requests\Admin\ApproveProductProposalRequest;
+use IJIDeals\IJIProductCatalog\Http\Requests\Admin\RejectProductProposalRequest;
+use IJIDeals\IJIProductCatalog\Http\Requests\Admin\NeedsRevisionProductProposalRequest;
 
+/**
+ * Admin controller for managing Product Proposals submitted by shops.
+ * Allows admins to review, approve (creating a MasterProduct), reject, or request revisions.
+ */
 class ProductProposalController extends Controller
 {
     /**
-     * Display a listing of product proposals for admin review.
+     * Display a paginated listing of Product Proposals for admin review.
+     * Supports filtering by status and shop_id.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
-        Log::info('Admin ProductProposalController: Fetching all product proposals.');
-        // TODO: Authorization check for platform admin
+        $adminUserId = $request->user() ? $request->user()->id : (Auth::id() ?? null);
+        Log::debug('Admin ProductProposalController@index: Fetching product proposals.', ['admin_user_id' => $adminUserId, 'filters' => $request->query()]);
+
+        // Authorization placeholder
+        // if ($request->user() && $request->user()->cannot('viewAny', ProductProposal::class)) { ... }
+
         $query = ProductProposal::with('shop:id,name', 'masterProduct:id,name');
 
         if ($request->filled('status')) {
@@ -29,114 +44,179 @@ class ProductProposalController extends Controller
             $query->where('shop_id', $request->input('shop_id'));
         }
 
-        $proposals = $query->orderBy('created_at', 'desc')->paginate(20);
-        Log::info('Admin ProductProposalController: Product proposals fetched successfully.', ['count' => $proposals->count()]);
+        $proposals = $query->orderByDesc('created_at')->paginate(config('ijiproductcatalog.pagination.admin_proposals', 20));
+        Log::info('Admin ProductProposalController@index: Product proposals fetched successfully.', ['admin_user_id' => $adminUserId, 'count' => $proposals->count(), 'total' => $proposals->total()]);
         return response()->json($proposals);
     }
 
     /**
-     * Display the specified product proposal.
+     * Display the specified Product Proposal.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal The ProductProposal instance via route model binding.
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(Request $request, ProductProposal $productProposal)
     {
-        Log::info('Admin ProductProposalController: Showing product proposal details.', ['proposal_id' => $productProposal->id]);
-        // TODO: Authorization check for platform admin
+        $adminUserId = $request->user() ? $request->user()->id : (Auth::id() ?? null);
+        Log::debug('Admin ProductProposalController@show: Showing product proposal details.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
+
+        // Authorization placeholder
+        // if ($request->user() && $request->user()->cannot('view', $productProposal)) { ... }
+
         $productProposal->load('shop:id,name', 'masterProduct:id,name');
+        Log::info('Admin ProductProposalController@show: Product proposal details fetched.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
         return response()->json($productProposal);
     }
 
     /**
-     * Approve a product proposal and create a MasterProduct.
+     * Approve a Product Proposal.
+     * This action creates a new MasterProduct based on the proposal data and updates the proposal's status.
+     *
+     * @param  \IJIDeals\IJIProductCatalog\Http\Requests\Admin\ApproveProductProposalRequest  $request
+     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal The ProductProposal to approve.
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function approve(Request $request, ProductProposal $productProposal)
+    public function approve(ApproveProductProposalRequest $request, ProductProposal $productProposal)
     {
-        Log::info('Admin ProductProposalController: Attempting to approve product proposal.', ['proposal_id' => $productProposal->id]);
-        // TODO: Authorization check for platform admin
+        $adminUserId = $request->user() ? $request->user()->id : (Auth::id() ?? null);
+        Log::debug('Admin ProductProposalController@approve: Attempting to approve product proposal.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'request_data' => $request->all()]);
+
+        // Authorization handled by ApproveProductProposalRequest->authorize()
+
         if ($productProposal->status !== 'pending' && $productProposal->status !== 'needs_revision') {
-            Log::warning('Admin ProductProposalController: Attempted to approve non-pending/non-revision proposal.', ['proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
-            return response()->json(['message' => 'Proposal cannot be approved in its current status.'], 400);
+            Log::warning('Admin ProductProposalController@approve: Attempted to approve non-pending/non-revision proposal.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
+            return response()->json(['message' => 'Proposal cannot be approved in its current status: ' . $productProposal->status . '.'], 400);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'brand_id' => ['nullable', 'integer', Rule::exists(config('ijiproductcatalog.tables.brands', 'brands'), 'id')],
-            'category_id' => ['nullable', 'integer', Rule::exists(config('ijiproductcatalog.tables.categories', 'categories'), 'id')],
-            'specifications' => 'nullable|array',
-            'status' => ['required', 'string', Rule::in(['active', 'draft_by_admin', 'archived'])],
-            // No direct image upload here, images are handled via MasterProductController after creation
-        ]);
+        $validatedData = $request->validated();
+        Log::debug('Admin ProductProposalController@approve: Validation passed via FormRequest.', ['admin_user_id' => $adminUserId, 'validated_data' => $validatedData]);
 
         DB::beginTransaction();
+        Log::debug('Admin ProductProposalController@approve: Transaction started.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
         try {
-            $masterProduct = MasterProduct::create(array_merge($validated, [
+            $masterProduct = MasterProduct::create([
+                'name' => $validatedData['name'],
+                'slug' => \Illuminate\Support\Str::slug($validatedData['name']),
+                'description' => $validatedData['description'],
+                'brand_id' => $validatedData['brand_id'],
+                'category_id' => $validatedData['category_id'],
+                'specifications' => $validatedData['specifications'],
+                'status' => $validatedData['status'],
                 'created_by_proposal_id' => $productProposal->id,
-                'slug' => \Illuminate\Support\Str::slug($validated['name']),
-            ]));
+            ]);
+            Log::info('Admin ProductProposalController@approve: MasterProduct created from proposal.', ['admin_user_id' => $adminUserId, 'master_product_id' => $masterProduct->id, 'proposal_id' => $productProposal->id]);
 
             $productProposal->update([
                 'status' => 'approved',
-                'admin_notes' => $request->input('admin_notes'),
+                'admin_notes' => $validatedData['admin_notes'],
                 'approved_master_product_id' => $masterProduct->id,
             ]);
+            Log::info('Admin ProductProposalController@approve: ProductProposal status updated to approved.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
 
             DB::commit();
-            Log::info('Admin ProductProposalController: Product proposal approved and MasterProduct created.', ['proposal_id' => $productProposal->id, 'master_product_id' => $masterProduct->id]);
-            return response()->json($masterProduct, 200);
+            Log::info('Admin ProductProposalController@approve: Transaction committed.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'master_product_id' => $masterProduct->id]);
+
+            // TODO: Notify shop owner of approval
+
+            return response()->json($masterProduct->fresh()->load('brand:id,name', 'category:id,name'), 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Admin ProductProposalController: Failed to approve product proposal.', ['proposal_id' => $productProposal->id, 'error' => $e->getMessage()]);
+            Log::error('Admin ProductProposalController@approve: Failed to approve product proposal, transaction rolled back.', [
+                'admin_user_id' => $adminUserId,
+                'proposal_id' => $productProposal->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json(['message' => 'Failed to approve proposal: ' . $e->getMessage()], 500);
         }
     }
 
     /**
-     * Reject a product proposal.
+     * Reject a Product Proposal.
+     * Updates the proposal's status to 'rejected' and records admin notes.
+     *
+     * @param  \IJIDeals\IJIProductCatalog\Http\Requests\Admin\RejectProductProposalRequest  $request
+     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal The ProductProposal to reject.
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function reject(Request $request, ProductProposal $productProposal)
+    public function reject(RejectProductProposalRequest $request, ProductProposal $productProposal)
     {
-        Log::info('Admin ProductProposalController: Attempting to reject product proposal.', ['proposal_id' => $productProposal->id]);
-        // TODO: Authorization check for platform admin
+        $adminUserId = $request->user() ? $request->user()->id : (Auth::id() ?? null);
+        Log::debug('Admin ProductProposalController@reject: Attempting to reject product proposal.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'request_data' => $request->all()]);
+
+        // Authorization handled by RejectProductProposalRequest->authorize()
+
         if ($productProposal->status !== 'pending' && $productProposal->status !== 'needs_revision') {
-            Log::warning('Admin ProductProposalController: Attempted to reject non-pending/non-revision proposal.', ['proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
-            return response()->json(['message' => 'Proposal cannot be rejected in its current status.'], 400);
+            Log::warning('Admin ProductProposalController@reject: Attempted to reject non-pending/non-revision proposal.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
+            return response()->json(['message' => 'Proposal cannot be rejected in its current status: ' . $productProposal->status . '.'], 400);
         }
 
-        $validated = $request->validate([
-            'admin_notes' => 'required|string|max:5000',
-        ]);
+        $validatedData = $request->validated();
+        Log::debug('Admin ProductProposalController@reject: Validation passed via FormRequest.', ['admin_user_id' => $adminUserId, 'validated_data' => $validatedData]);
 
-        $productProposal->update([
-            'status' => 'rejected',
-            'admin_notes' => $validated['admin_notes'],
-        ]);
+        try {
+            $productProposal->update([
+                'status' => 'rejected',
+                'admin_notes' => $validatedData['admin_notes'],
+            ]);
+            Log::info('Admin ProductProposalController@reject: Product proposal rejected.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
 
-        Log::info('Admin ProductProposalController: Product proposal rejected.', ['proposal_id' => $productProposal->id]);
-        return response()->json(['message' => 'Proposal rejected successfully.'], 200);
+            // TODO: Notify shop owner of rejection
+
+            return response()->json(['message' => 'Proposal rejected successfully.'], 200);
+        } catch (\Exception $e) {
+            Log::error('Admin ProductProposalController@reject: Error rejecting product proposal.', [
+                'admin_user_id' => $adminUserId,
+                'proposal_id' => $productProposal->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Error rejecting proposal.'], 500);
+        }
     }
 
     /**
-     * Mark a product proposal as needing revision.
+     * Mark a Product Proposal as needing revision by the shop.
+     * Updates the proposal's status to 'needs_revision' and records admin notes.
+     *
+     * @param  \IJIDeals\IJIProductCatalog\Http\Requests\Admin\NeedsRevisionProductProposalRequest  $request
+     * @param  \IJIDeals\IJIProductCatalog\Models\ProductProposal  $productProposal The ProductProposal to mark.
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function needsRevision(Request $request, ProductProposal $productProposal)
+    public function needsRevision(NeedsRevisionProductProposalRequest $request, ProductProposal $productProposal)
     {
-        Log::info('Admin ProductProposalController: Marking product proposal as needs revision.', ['proposal_id' => $productProposal->id]);
-        // TODO: Authorization check for platform admin
+        $adminUserId = $request->user() ? $request->user()->id : (Auth::id() ?? null);
+        Log::debug('Admin ProductProposalController@needsRevision: Marking product proposal as needs revision.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'request_data' => $request->all()]);
+
+        // Authorization handled by NeedsRevisionProductProposalRequest->authorize()
+
         if ($productProposal->status !== 'pending') {
-            Log::warning('Admin ProductProposalController: Attempted to mark non-pending proposal as needs revision.', ['proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
-            return response()->json(['message' => 'Proposal can only be marked as needs revision if it is pending.'], 400);
+            Log::warning('Admin ProductProposalController@needsRevision: Attempted to mark non-pending proposal as needs revision.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id, 'status' => $productProposal->status]);
+            return response()->json(['message' => 'Proposal can only be marked as "needs revision" if it is currently pending.'], 400);
         }
 
-        $validated = $request->validate([
-            'admin_notes' => 'required|string|max:5000',
-        ]);
+        $validatedData = $request->validated();
+        Log::debug('Admin ProductProposalController@needsRevision: Validation passed via FormRequest.', ['admin_user_id' => $adminUserId, 'validated_data' => $validatedData]);
 
-        $productProposal->update([
-            'status' => 'needs_revision',
-            'admin_notes' => $validated['admin_notes'],
-        ]);
+        try {
+            $productProposal->update([
+                'status' => 'needs_revision',
+                'admin_notes' => $validatedData['admin_notes'],
+            ]);
+            Log::info('Admin ProductProposalController@needsRevision: Product proposal marked as needs revision.', ['admin_user_id' => $adminUserId, 'proposal_id' => $productProposal->id]);
 
-        Log::info('Admin ProductProposalController: Product proposal marked as needs revision.', ['proposal_id' => $productProposal->id]);
-        return response()->json(['message' => 'Proposal marked as needs revision successfully.'], 200);
+            // TODO: Notify shop owner that revisions are needed
+
+            return response()->json(['message' => 'Proposal marked as needs revision successfully.'], 200);
+        } catch (\Exception $e) {
+            Log::error('Admin ProductProposalController@needsRevision: Error marking proposal as needs revision.', [
+                'admin_user_id' => $adminUserId,
+                'proposal_id' => $productProposal->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Error marking proposal as needs revision.'], 500);
+        }
     }
 }

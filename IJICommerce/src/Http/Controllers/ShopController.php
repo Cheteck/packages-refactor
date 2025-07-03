@@ -2,236 +2,192 @@
 
 namespace IJIDeals\IJICommerce\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller; // Use Illuminate\Routing\Controller for base controller
+use Illuminate\Http\Request; // Keep for index, show, destroy that don't use FormRequests yet or for $request->user()
+use Illuminate\Routing\Controller;
 use IJIDeals\IJICommerce\Models\Shop;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule; // For unique slug validation
-
-// Assuming Spatie's PermissionModels are available
+use Illuminate\Support\Facades\Auth; // Keep if $request->user() is not preferred everywhere
+use Illuminate\Support\Facades\Log;
+// use Illuminate\Validation\Rule; // No longer needed here
 use Spatie\Permission\Models\Role;
+use IJIDeals\IJICommerce\Http\Requests\StoreShopRequest;
+use IJIDeals\IJICommerce\Http\Requests\UpdateShopRequest;
 
-
+/**
+ * Controller for managing Shops.
+ * Handles CRUD operations for shops and related functionalities.
+ */
 class ShopController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Display a listing of shops accessible to the authenticated user.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
         $user = $request->user();
-        // This is a simplified index. A more complex one might involve checking
-        // all shops a user has any role in, or shops they own/administer.
-        // For now, let's assume we list shops where the user is 'Owner'.
-        // This requires Spatie's team permissions to be correctly set up.
+        Log::debug("ShopController@index: Fetching shops for user.", ['user_id' => $user ? $user->id : null]);
 
-        // To get shops where user has a specific role (e.g., 'Owner')
-        // This is a bit more complex with Spatie teams as there isn't a direct
-        // $user->shopsWhereRoleIs('Owner') out of the box.
-        // You'd typically iterate over user's roles scoped to teams or query the model_has_roles table.
-
-        // A simpler approach for now: list all shops, or shops created by the user if we had owner_id.
-        // Since owner_id is removed, a more robust solution is needed.
-        // For this initial step, let's return all shops, and note that permissions need to be layered.
-        // Or, if we want to be strict, only allow access via specific user-shop links.
-
-        // Let's assume for now, index shows shops the user has *any* role in.
-        // This still needs a custom query if not using a specific Spatie trait for it.
-        // For true simplicity in this step:
-        // $shops = Shop::all();
-        // return response()->json($shops);
-        // However, this is not secure.
-
-        // TODO: Implement proper retrieval of shops based on user's team roles.
-        // For now, as a placeholder that requires the user to be authenticated:
         if (!$user) {
+            Log::warning("ShopController@index: Unauthenticated user attempted to list shops.");
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Authorize using ShopPolicy@viewAny (checks if user can list any shops at all)
+        // Authorization is handled by ShopPolicy through $user->can() or middleware
+        // For index, typically a 'viewAny' policy is checked.
         if ($user->cannot('viewAny', Shop::class)) {
+            Log::warning("ShopController@index: Authorization failed for user to list shops.", ['user_id' => $user->id, 'action' => 'viewAny']);
             return response()->json(['message' => 'You are not authorized to list shops.'], 403);
         }
 
         // Get the team foreign key column name from Spatie's config
         $teamForeignKey = config('permission.column_names.team_foreign_key', 'team_id');
         $modelHasRolesTable = config('permission.table_names.model_has_roles', 'model_has_roles');
-        $userModelKeyName = $user->getKeyName(); // e.g., 'id'
 
         // Get shop IDs where the user has any role
         $shopIds = \Illuminate\Support\Facades\DB::table($modelHasRolesTable)
-            ->where('model_type', $user->getMorphClass()) // Use getMorphClass() for correctness with morph maps
+            ->where('model_type', $user->getMorphClass())
             ->where('model_id', $user->getKey())
-            ->whereNotNull($teamForeignKey) // Ensure it's a team-scoped role
+            ->whereNotNull($teamForeignKey)
             ->distinct()
             ->pluck($teamForeignKey);
 
-        $shops = Shop::whereIn('id', $shopIds)->paginate(15);
+        Log::debug("ShopController@index: Found shop IDs for user.", ['user_id' => $user->id, 'shop_ids' => $shopIds->toArray()]);
+
+        $shops = Shop::whereIn('id', $shopIds)->paginate(config('ijicommerce.pagination.shops', 15));
+        Log::info("ShopController@index: Successfully fetched shops.", ['user_id' => $user->id, 'count' => $shops->count(), 'total' => $shops->total()]);
 
         return response()->json($shops);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created Shop in storage.
+     * Assigns the creating user as 'Owner' of the new shop.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \IJIDeals\IJICommerce\Http\Requests\StoreShopRequest  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function store(StoreShopRequest $request)
     {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated for shop creation.'], 401);
-        }
+        $user = $request->user(); // User is already available via FormRequest
+        Log::debug("ShopController@store: Attempting to create shop.", ['user_id' => $user->id, 'request_data' => $request->all()]);
 
-        // Authorize using ShopPolicy@create
-        // Note: $this->authorize typically requires the controller to use AuthorizesRequests trait.
-        // If not using that trait, call Gate directly: Gate::authorize('create', Shop::class);
-        // Assuming AuthorizesRequests trait will be added or Gate is used.
-        // For now, let's assume direct Gate call or that the trait is present.
-        if ($user->cannot('create', Shop::class)) {
-             return response()->json(['message' => 'You are not authorized to create shops.'], 403);
-        }
+        // Authorization is handled by StoreShopRequest->authorize()
+        // Validation is handled by StoreShopRequest->rules()
 
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => [
-                'nullable',
-                'string',
-                'max:255',
-                Rule::unique(config('ijicommerce.tables.shops', 'shops'), 'slug') // Using Shop model's table
-            ],
-            'description' => 'nullable|string',
-            'contact_email' => 'nullable|email|max:255',
-            'contact_phone' => 'nullable|string|max:50',
-            'website_url' => 'nullable|url|max:255',
-            'status' => ['nullable', 'string', Rule::in(['active', 'inactive', 'pending_approval', 'suspended'])],
-            'display_address' => 'nullable|string|max:1000',
-            'logo_path' => 'nullable|string|max:2048', // Consider validation for actual file uploads later
-            'cover_photo_path' => 'nullable|string|max:2048',
-            'settings' => 'nullable|array',
-            'meta_title' => 'nullable|string|max:255',
-            'meta_description' => 'nullable|string|max:500',
-            'meta_keywords' => 'nullable|string|max:500',
-        ]);
+        $validatedData = $request->validated();
+        Log::debug("ShopController@store: Validation passed via FormRequest.", ['user_id' => $user->id, 'validated_data' => $validatedData]);
 
-        if (empty($validatedData['status'])) {
-            $validatedData['status'] = 'pending_approval'; // Default status
-        }
+        // prepareForValidation in StoreShopRequest handles default status
+        // if (empty($validatedData['status'])) {
+        //     $validatedData['status'] = 'pending_approval';
+        // }
 
         $shop = Shop::create($validatedData);
+        Log::info("ShopController@store: Shop created successfully.", ['user_id' => $user->id, 'shop_id' => $shop->id]);
 
-        // Assign 'Owner' role to the creating user for this shop
-        // This assumes Spatie teams are configured with Shop as the team model
-        // and 'shop_id' as the team_foreign_key.
-        $ownerRoleName = 'Owner'; // Make this configurable if needed
-
-        // Ensure the role exists globally (or create it if your seeder hasn't run)
+        $ownerRoleName = config('ijicommerce.defaults.owner_role_name', 'Owner');
         $role = Role::firstOrCreate(
             ['name' => $ownerRoleName, 'guard_name' => $user->guard_name ?? config('auth.defaults.guard')],
-            [$teamKeyField = config('permission.column_names.team_foreign_key', 'team_id') => null] // Global role
+            [config('permission.column_names.team_foreign_key', 'team_id') => null]
         );
 
-        if ($user && method_exists($user, 'assignRole')) {
-            $user->assignRole($role->name, $shop); // Assign role scoped to the $shop (team)
-            $this->commandOutput("Assigned role '{$role->name}' to user ID {$user->id} for shop ID {$shop->id}");
+        if (method_exists($user, 'assignRole')) {
+            $user->assignRole($role->name, $shop);
+            Log::info("ShopController@store: Assigned role to user for new shop.", ['user_id' => $user->id, 'shop_id' => $shop->id, 'role_name' => $role->name]);
         } else {
-             $this->commandOutput("User model does not have assignRole method or user is null. Spatie HasRoles trait might be missing or user not authenticated.", 'error');
-            // Potentially roll back shop creation or log an error
-            // For now, we'll proceed, but this is a critical point.
+            Log::error("ShopController@store: User model does not have assignRole method. Spatie HasRoles trait might be missing.", ['user_id' => $user->id, 'shop_id' => $shop->id]);
         }
 
-        return response()->json($shop, 201);
+        return response()->json($shop->fresh(), 201); // Return fresh model
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function show(Request $request, Shop $shop) // Route model binding, added Request
-    {
-        if ($request->user()->cannot('view', $shop)) {
-            return response()->json(['message' => 'You are not authorized to view this shop.'], 403);
-        }
-        return response()->json($shop);
-    }
-
-    /**
-     * Update the specified resource in storage.
+     * Display the specified Shop.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Shop $shop)
+    public function show(Request $request, Shop $shop)
     {
-        if ($request->user()->cannot('update', $shop)) {
-            return response()->json(['message' => 'You are not authorized to update this shop.'], 403);
+        $user = $request->user();
+        Log::debug("ShopController@show: Fetching shop.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id]);
+
+        // Authorization handled by ShopPolicy
+        if ($user->cannot('view', $shop)) {
+            Log::warning("ShopController@show: Authorization failed for user to view shop.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id, 'action' => 'view']);
+            return response()->json(['message' => 'You are not authorized to view this shop.'], 403);
         }
-
-        $validatedData = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'slug' => [
-                'sometimes',
-                'nullable',
-                'string',
-                'max:255',
-                Rule::unique(config('ijicommerce.tables.shops', 'shops'), 'slug')->ignore($shop->id)
-            ],
-            'description' => 'nullable|string',
-            'contact_email' => 'nullable|email|max:255',
-            'contact_phone' => 'nullable|string|max:50',
-            'website_url' => 'nullable|url|max:255',
-            'status' => ['sometimes', 'required', 'string', Rule::in(['active', 'inactive', 'pending_approval', 'suspended'])],
-            'display_address' => 'nullable|string|max:1000',
-            'logo_path' => 'nullable|string|max:2048',
-            'cover_photo_path' => 'nullable|string|max:2048',
-            'settings' => 'nullable|array',
-            'approved_at' => 'nullable|date',
-            'meta_title' => 'nullable|string|max:255',
-            'meta_description' => 'nullable|string|max:500',
-            'meta_keywords' => 'nullable|string|max:500',
-        ]);
-
-        $shop->update($validatedData);
-
+        Log::info("ShopController@show: Successfully fetched shop.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id]);
         return response()->json($shop);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Update the specified Shop in storage.
      *
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
+     * @param  \IJIDeals\IJICommerce\Http\Requests\UpdateShopRequest  $request
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Request $request, Shop $shop) // Added Request
+    public function update(UpdateShopRequest $request, Shop $shop)
     {
-        if ($request->user()->cannot('delete', $shop)) {
+        $user = $request->user();
+        Log::debug("ShopController@update: Attempting to update shop.", ['user_id' => $user->id, 'shop_id' => $shop->id, 'request_data' => $request->all()]);
+
+        // Authorization is handled by UpdateShopRequest->authorize()
+        // Validation is handled by UpdateShopRequest->rules()
+
+        $validatedData = $request->validated();
+        Log::debug("ShopController@update: Validation passed via FormRequest.", ['user_id' => $user->id, 'shop_id' => $shop->id, 'validated_data' => $validatedData]);
+
+        $shop->update($validatedData);
+        Log::info("ShopController@update: Shop updated successfully.", ['user_id' => $user->id, 'shop_id' => $shop->id]);
+
+        return response()->json($shop->fresh()); // Return fresh model
+    }
+
+    /**
+     * Remove the specified Shop from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop instance via route model binding.
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(Request $request, Shop $shop)
+    {
+        $user = $request->user();
+        Log::debug("ShopController@destroy: Attempting to delete shop.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id]);
+
+        if ($user->cannot('delete', $shop)) {
+            Log::warning("ShopController@destroy: Authorization failed for user to delete shop.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id, 'action' => 'delete']);
             return response()->json(['message' => 'You are not authorized to delete this shop.'], 403);
         }
 
-        $shop->delete(); // Or $shop->forceDelete(); if not using soft deletes
+        $shop->delete();
+        Log::info("ShopController@destroy: Shop deleted successfully.", ['user_id' => $user ? $user->id : null, 'shop_id' => $shop->id]);
 
         return response()->json(['message' => 'Shop deleted successfully.'], 200);
     }
 
-    // Helper for command output during development, can be removed later
+    // Helper for command output during development, can be removed or adapted for logging
     private function commandOutput($message, $type = 'info')
     {
+        // This method seems specific to console output during development.
+        // For general logging, prefer direct Log::info, Log::error etc.
+        // If this needs to remain for console specific feedback and also log, it can be adapted.
+        // For now, direct logging is added in the main methods.
+        Log::debug("ShopController::commandOutput (dev helper):", ['message' => $message, 'type' => $type]);
+
+        // Retain original functionality if still needed for direct console feedback from web context (unusual)
         if (app()->runningInConsole() && method_exists(app('Illuminate\Contracts\Console\Kernel'), 'getArtisan')) {
             $command = app('Illuminate\Contracts\Console\Kernel')->getArtisan()->runningCommand();
             if ($command && method_exists($command, $type)) {
                 $command->{$type}($message);
             } else {
-                echo "[$type] $message\n";
+                // echo "[$type] $message\n"; // Avoid echo in controllers if possible
             }
-        } else {
-            // For non-console (e.g. web requests during testing if needed)
-            // Log::{$type}($message); // Or echo, or nothing
         }
     }
 }

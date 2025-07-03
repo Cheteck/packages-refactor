@@ -2,7 +2,7 @@
 
 namespace IJIDeals\Social\Models;
 
-use IJIDeals\UserManagement\Models\User;
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Annotations as OA;
 
@@ -84,7 +84,7 @@ class Reaction extends Model
      */
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class));
     }
 
     /**

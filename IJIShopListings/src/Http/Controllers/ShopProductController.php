@@ -2,33 +2,40 @@
 
 namespace IJIDeals\IJIShopListings\Http\Controllers;
 
-use Illuminate\Http\Request;
+use Illuminate\Http\Request; // Keep for indexMasterProducts, indexShopProducts, show, destroy, acknowledgeMasterProductUpdate
 use Illuminate\Routing\Controller;
 use IJIDeals\IJICommerce\Models\Shop;
 use IJIDeals\IJIProductCatalog\Models\MasterProduct;
 use IJIDeals\IJIShopListings\Models\ShopProduct;
-use IJIDeals\IJIShopListings\Models\ShopProductVariation;
-use Illuminate\Validation\Rule;
+// use IJIDeals\IJIShopListings\Models\ShopProductVariation; // Not directly used as a type-hint, remove
+// use Illuminate\Validation\Rule; // No longer needed here
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use IJIDeals\IJIShopListings\Http\Requests\StoreShopProductRequest;
+use IJIDeals\IJIShopListings\Http\Requests\UpdateShopProductRequest;
 
+/**
+ * Controller for managing shop-specific product listings (ShopProducts).
+ * Handles how a Shop lists, prices, and manages stock for products from the MasterProduct catalog.
+ */
 class ShopProductController extends Controller
 {
     /**
-     * Display a listing of master products available for a shop to sell.
-     * (i.e., active MasterProducts not yet listed by this specific shop)
+     * Display a listing of MasterProducts available for a specific Shop to list.
+     * These are active MasterProducts not yet listed by the Shop.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop for which to list available MasterProducts.
      * @return \Illuminate\Http\JsonResponse
      */
     public function indexMasterProducts(Request $request, Shop $shop)
     {
-        Log::info('ShopProductController: Fetching available master products for shop.', ['shop_id' => $shop->id, 'user_id' => Auth::id()]);
-        // Policy: Can user 'manage products' for this shop?
+        $userId = $request->user() ? $request->user()->id : null;
+        Log::info('ShopProductController@indexMasterProducts: Fetching available master products for shop.', ['shop_id' => $shop->id, 'user_id' => $userId]);
+
         if ($request->user()->cannot('manageShopProducts', $shop)) {
-            Log::warning('ShopProductController: Unauthorized attempt to list available master products.', ['shop_id' => $shop->id, 'user_id' => Auth::id()]);
+            Log::warning('ShopProductController@indexMasterProducts: Unauthorized.', ['shop_id' => $shop->id, 'user_id' => $userId]);
             return response()->json(['message' => "Unauthorized to list available products for shop '{$shop->name}'."], 403);
         }
 
@@ -48,7 +55,8 @@ class ShopProductController extends Controller
             $query->where('category_id', $request->input('category_id'));
         }
 
-        $availableMasterProducts = $query->orderBy('name')->paginate($request->input('per_page', 20));
+        $availableMasterProducts = $query->orderBy('name')
+                                     ->paginate($request->input('per_page', config('ijishoplistings.pagination.master_products', 20)));
 
         $availableMasterProducts->getCollection()->transform(function($product){
             $product->base_image_urls = $product->getMedia(config('ijiproductcatalog.media_collections.master_product_base_images', 'master_product_base_images'))->map(function ($media) {
@@ -56,22 +64,24 @@ class ShopProductController extends Controller
             });
             return $product;
         });
-        Log::info('ShopProductController: Available master products fetched successfully.', ['shop_id' => $shop->id, 'count' => $availableMasterProducts->count()]);
+        Log::info('ShopProductController@indexMasterProducts: Available master products fetched.', ['shop_id' => $shop->id, 'user_id' => $userId, 'count' => $availableMasterProducts->count()]);
         return response()->json($availableMasterProducts);
     }
 
     /**
-     * Display a listing of the shop's own product listings (ShopProducts).
+     * Display a paginated listing of the Shop's own product listings (ShopProducts).
+     * Includes details of the linked MasterProduct and any ShopProductVariations.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop whose listings are to be displayed.
      * @return \Illuminate\Http\JsonResponse
      */
     public function indexShopProducts(Request $request, Shop $shop)
     {
-        Log::info('ShopProductController: Fetching shop products for shop.', ['shop_id' => $shop->id, 'user_id' => Auth::id()]);
+        $userId = $request->user() ? $request->user()->id : null;
+        Log::info('ShopProductController@indexShopProducts: Fetching shop products.', ['shop_id' => $shop->id, 'user_id' => $userId]);
         if ($request->user()->cannot('manageShopProducts', $shop)) {
-             Log::warning('ShopProductController: Unauthorized attempt to list shop products.', ['shop_id' => $shop->id, 'user_id' => Auth::id()]);
+             Log::warning('ShopProductController@indexShopProducts: Unauthorized.', ['shop_id' => $shop->id, 'user_id' => $userId]);
              return response()->json(['message' => "Unauthorized to list products for shop '{$shop->name}'."], 403);
         }
 
@@ -90,8 +100,13 @@ class ShopProductController extends Controller
                 $q->where('name', 'LIKE', '%' . $request->input('name') . '%');
             });
         }
+         if ($request->filled('is_visible')) {
+            $query->where('is_visible_in_shop', filter_var($request->input('is_visible'), FILTER_VALIDATE_BOOLEAN));
+        }
 
-        $shopProducts = $query->orderBy('created_at', 'desc')->paginate($request->input('per_page', 20));
+
+        $shopProducts = $query->orderByDesc('created_at')
+                             ->paginate($request->input('per_page', config('ijishoplistings.pagination.shop_products', 20)));
 
         $shopProducts->getCollection()->transform(function ($shopProduct) {
             if ($shopProduct->variations->isEmpty()) {
@@ -101,91 +116,84 @@ class ShopProductController extends Controller
                 $shopProduct->variations->transform(function ($variation) {
                     $variation->effective_price = $variation->getEffectivePriceAttribute();
                     $variation->is_on_sale = $variation->getIsOnSaleAttribute();
-                    $variation->variant_image_url = $variation->masterProductVariation->getFirstMediaUrl(config('ijiproductcatalog.media_collections.master_product_variant_image', 'master_product_variant_images'), 'thumb');
+                    if ($variation->masterProductVariation) { // Ensure relation is loaded
+                        $variation->variant_image_url = $variation->masterProductVariation->getFirstMediaUrl(config('ijiproductcatalog.media_collections.master_product_variant_image', 'master_product_variant_images'), 'thumb');
+                    }
                     return $variation;
                 });
             }
             $shopProduct->shop_image_urls = $shopProduct->getMedia(config('ijishoplistings.media_collections.shop_product_additional_images', 'shop_product_additional_images'))->map(fn($media) => ['id' => $media->id, 'original' => $media->getUrl(), 'thumb' => $media->getUrl('thumb')]);
             return $shopProduct;
         });
-        Log::info('ShopProductController: Shop products fetched successfully.', ['shop_id' => $shop->id, 'count' => $shopProducts->count()]);
+        Log::info('ShopProductController@indexShopProducts: Shop products fetched.', ['shop_id' => $shop->id, 'user_id' => $userId, 'count' => $shopProducts->count()]);
         return response()->json($shopProducts);
     }
 
 
     /**
-     * Store a new ShopProduct ("Sell This" action).
-     * Links a MasterProduct to a Shop with shop-specific details.
+     * Store a new ShopProduct, effectively listing a MasterProduct in a specific Shop.
+     * Handles shop-specific pricing, stock, images, and variations if applicable.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
+     * @param  \IJIDeals\IJIShopListings\Http\Requests\StoreShopProductRequest  $request
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The Shop to which the product is being listed.
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request, Shop $shop)
+    public function store(StoreShopProductRequest $request, Shop $shop)
     {
-        Log::info('ShopProductController: Attempting to store new shop product.', ['shop_id' => $shop->id, 'user_id' => Auth::id(), 'request_data' => $request->all()]);
-        if ($request->user()->cannot('manageShopProducts', $shop)) {
-             Log::warning('ShopProductController: Unauthorized attempt to add product to shop.', ['shop_id' => $shop->id, 'user_id' => Auth::id()]);
-             return response()->json(['message' => "Unauthorized to add products to shop '{$shop->name}'."], 403);
-        }
+        $userId = $request->user()->id; // User is guaranteed by FormRequest
+        Log::info('ShopProductController@store: Attempting to store new shop product.', ['shop_id' => $shop->id, 'user_id' => $userId, 'request_data' => $request->all()]);
 
-        $validated = $request->validate([
-            'master_product_id' => [
-                'required',
-                Rule::exists((new MasterProduct())->getTable(), 'id')->where('status', 'active'),
-                Rule::unique((new ShopProduct())->getTable())->where(function ($query) use ($shop) {
-                    return $query->where('shop_id', $shop->id);
-                })->setMessage('This product is already listed in your shop.')
-            ],
-            'price' => 'required_without:variations|numeric|min:0',
-            'stock_quantity' => 'required_without:variations|integer|min:0',
-            'is_visible_in_shop' => 'sometimes|boolean',
-            'shop_specific_notes' => 'nullable|string|max:5000',
-            'shop_images' => 'nullable|array',
-            'shop_images.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:2048',
-            'sale_price' => 'nullable|numeric|min:0|lt:price',
-            'sale_start_date' => 'nullable|date|required_with:sale_price',
-            'sale_end_date' => 'nullable|date|after_or_equal:sale_start_date',
-            'variations' => 'nullable|array',
-            'variations.*.master_product_variation_id' => ['required_with:variations', 'integer', Rule::exists(config('ijiproductcatalog.tables.master_product_variations','master_product_variations'), 'id')],
-            'variations.*.price' => 'required_with:variations|numeric|min:0',
-            'variations.*.stock_quantity' => 'required_with:variations|integer|min:0',
-            'variations.*.shop_sku_variant' => 'nullable|string|max:255',
-            'variations.*.sale_price' => 'nullable|numeric|min:0',
-            'variations.*.sale_start_date' => 'nullable|date|required_with:variations.*.sale_price',
-            'variations.*.sale_end_date' => 'nullable|date|after_or_equal:variations.*.sale_start_date',
-        ]);
+        // Authorization and basic validation handled by StoreShopProductRequest
+        $validatedData = $request->validated();
+        Log::debug('ShopProductController@store: Validation passed via FormRequest.', ['validated_data' => $validatedData]);
 
-        $masterProduct = MasterProduct::with('variations')->find($validated['master_product_id']);
-        $masterVersionHash = md5($masterProduct->name . $masterProduct->description . json_encode($masterProduct->specifications));
+        $masterProduct = MasterProduct::with('variations')->find($validatedData['master_product_id']);
+        // Calculate master_version_hash based on relevant MasterProduct fields
+        $masterVersionHash = md5(
+            $masterProduct->name .
+            $masterProduct->description .
+            json_encode($masterProduct->specifications) .
+            // Optionally include media signature if relevant for versioning
+            $masterProduct->getMedia(config('ijiproductcatalog.media_collections.master_product_base_images', 'master_product_base_images'))->map(fn($m) => $m->uuid)->sort()->implode(',')
+        );
 
-        $shopProductData = [
+
+        $shopProductInputData = [
             'master_product_id' => $masterProduct->id,
-            'is_visible_in_shop' => $validated['is_visible_in_shop'] ?? true,
-            'shop_specific_notes' => $validated['shop_specific_notes'] ?? null,
+            'is_visible_in_shop' => $validatedData['is_visible_in_shop'] ?? true, // Default handled in FormRequest prepareForValidation
+            'shop_specific_notes' => $validatedData['shop_specific_notes'] ?? null,
             'master_version_hash' => $masterVersionHash,
-            'needs_review_by_shop' => false,
-            'sale_price' => $validated['sale_price'] ?? null,
-            'sale_start_date' => $validated['sale_start_date'] ?? null,
-            'sale_end_date' => $validated['sale_end_date'] ?? null,
+            'needs_review_by_shop' => false, // New listings are initially in sync
+            'sale_price' => $validatedData['sale_price'] ?? null,
+            'sale_start_date' => $validatedData['sale_start_date'] ?? null,
+            'sale_end_date' => $validatedData['sale_end_date'] ?? null,
         ];
 
-        if ($masterProduct->variations->isEmpty() && empty($validated['variations'])) {
-            $shopProductData['price'] = $validated['price'];
-            $shopProductData['stock_quantity'] = $validated['stock_quantity'];
-        } else if (!empty($validated['variations'])) {
-            $shopProductData['price'] = $validated['price'] ?? null;
-            $shopProductData['stock_quantity'] = $validated['stock_quantity'] ?? 0;
-        } else {
-             $shopProductData['price'] = $validated['price'] ?? null;
-             $shopProductData['stock_quantity'] = $validated['stock_quantity'] ?? 0;
+        // Handle price/stock for non-variation products or when variations are not provided by shop
+        if ($masterProduct->variations->isEmpty() && empty($validatedData['variations'])) {
+            if (!isset($validatedData['price']) || !isset($validatedData['stock_quantity'])) {
+                 Log::error('ShopProductController@store: Price and stock are required for non-variation product.', ['shop_id' => $shop->id, 'master_product_id' => $masterProduct->id]);
+                return response()->json(['message' => 'Price and stock quantity are required for this product.'], 422);
+            }
+            $shopProductInputData['price'] = $validatedData['price'];
+            $shopProductInputData['stock_quantity'] = $validatedData['stock_quantity'];
+        } elseif (empty($validatedData['variations']) && $masterProduct->variations->isNotEmpty()) {
+            // Master has variations, but shop didn't provide any overrides. This case might need policy (e.g., require variation details).
+            // For now, we'll allow it but log. Shop might manage variations later.
+            Log::info('ShopProductController@store: Master product has variations, but no shop-specific variation data provided.', ['shop_id' => $shop->id, 'master_product_id' => $masterProduct->id]);
+            // Price/stock on main ShopProduct might be null or default if variations are expected.
+            $shopProductInputData['price'] = $validatedData['price'] ?? null; // Or set to 0 / some indicator
+            $shopProductInputData['stock_quantity'] = $validatedData['stock_quantity'] ?? 0;
+        } elseif (!empty($validatedData['variations'])) {
+             // If variations are provided, the main price/stock might be optional or derived.
+            $shopProductInputData['price'] = $validatedData['price'] ?? null;
+            $shopProductInputData['stock_quantity'] = $validatedData['stock_quantity'] ?? 0;
         }
 
-        $shopProduct = null;
+
         DB::beginTransaction();
         try {
-            $shopProductDataForCreate = collect($shopProductData)->except(['shop_images'])->toArray();
-            $shopProduct = $shop->shopProducts()->create($shopProductDataForCreate);
+            $shopProduct = $shop->shopProducts()->create($shopProductInputData);
 
             if ($request->hasFile('shop_images')) {
                 foreach ($request->file('shop_images') as $file) {
@@ -193,15 +201,15 @@ class ShopProductController extends Controller
                         $shopProduct->addMedia($file)->toMediaCollection(config('ijishoplistings.media_collections.shop_product_additional_images', 'shop_product_additional_images'));
                     }
                 }
-                Log::info('ShopProductController: Shop images uploaded for shop product.', ['shop_product_id' => $shopProduct->id]);
+                Log::info('ShopProductController@store: Shop images uploaded.', ['shop_product_id' => $shopProduct->id]);
             }
 
-            if (!empty($validated['variations']) && $masterProduct->variations->isNotEmpty()) {
-                foreach ($validated['variations'] as $variationInput) {
+            if (!empty($validatedData['variations']) && $masterProduct->variations->isNotEmpty()) {
+                foreach ($validatedData['variations'] as $variationInput) {
                     $masterVariation = $masterProduct->variations()->find($variationInput['master_product_variation_id']);
                     if (!$masterVariation) {
                         DB::rollBack();
-                        Log::error('ShopProductController: Invalid master_product_variation_id provided during store.', ['shop_id' => $shop->id, 'master_product_variation_id' => $variationInput['master_product_variation_id']]);
+                        Log::error('ShopProductController@store: Invalid master_product_variation_id provided.', ['shop_id' => $shop->id, 'master_product_variation_id' => $variationInput['master_product_variation_id']]);
                         return response()->json(['message' => "Invalid master_product_variation_id provided: {$variationInput['master_product_variation_id']}"], 422);
                     }
                     $shopProduct->variations()->create([
@@ -214,31 +222,32 @@ class ShopProductController extends Controller
                         'sale_end_date' => $variationInput['sale_end_date'] ?? null,
                     ]);
                 }
-                Log::info('ShopProductController: Shop product variations created.', ['shop_product_id' => $shopProduct->id, 'count' => count($validated['variations'])]);
+                Log::info('ShopProductController@store: Shop product variations created.', ['shop_product_id' => $shopProduct->id, 'count' => count($validatedData['variations'])]);
             }
             DB::commit();
-            $shopProduct->load(['masterProduct:id,name', 'variations.masterProductVariation.attributeOptions.attribute', 'media']);
-            $shopProduct->shop_image_urls = $shopProduct->getMedia(config('ijishoplistings.media_collections.shop_product_additional_images', 'shop_product_additional_images'))->map(fn($media) => ['original' => $media->getUrl(), 'thumb' => $media->getUrl('thumb')]);
+            $shopProduct->refresh()->load(['masterProduct:id,name', 'variations.masterProductVariation.attributeOptions.attribute', 'media']);
+            $shopProduct->shop_image_urls = $shopProduct->getMedia(config('ijishoplistings.media_collections.shop_product_additional_images', 'shop_product_additional_images'))->map(fn($media) => ['id' => $media->id, 'original' => $media->getUrl(), 'thumb' => $media->getUrl('thumb')]);
 
             if ($shopProduct->variations->isEmpty()) {
                 $shopProduct->effective_price = $shopProduct->getEffectivePriceAttribute();
                 $shopProduct->is_on_sale = $shopProduct->getIsOnSaleAttribute();
             }
-            Log::info('ShopProductController: Shop product stored successfully.', ['shop_product_id' => $shopProduct->id]);
+            Log::info('ShopProductController@store: Shop product stored successfully.', ['shop_product_id' => $shopProduct->id, 'user_id' => $userId]);
             return response()->json($shopProduct, 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('ShopProductController: Failed to store shop product.', ['shop_id' => $shop->id, 'error' => $e->getMessage()]);
+            Log::error('ShopProductController@store: Failed to store shop product.', ['shop_id' => $shop->id, 'user_id' => $userId, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['message' => 'Failed to list product: ' . $e->getMessage()], 500);
         }
     }
 
     /**
      * Display the specified ShopProduct.
+     * Ensures the ShopProduct belongs to the given Shop.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
-     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The parent Shop.
+     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct The ShopProduct instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
     public function show(Request $request, Shop $shop, ShopProduct $shopProduct)
@@ -278,14 +287,17 @@ class ShopProductController extends Controller
     }
 
     /**
-     * Update the specified ShopProduct.
+     * Update the specified ShopProduct in storage.
+     * Ensures the ShopProduct belongs to the given Shop.
+     * Handles updates to pricing, stock, visibility, notes, and shop-specific images.
+     * Allows acknowledging updates to the linked MasterProduct.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
-     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct
+     * @param  \IJIDeals\IJIShopListings\Http\Requests\UpdateShopProductRequest  $request
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The parent Shop.
+     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct The ShopProduct instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Shop $shop, ShopProduct $shopProduct)
+    public function update(UpdateShopProductRequest $request, Shop $shop, ShopProduct $shopProduct)
     {
         Log::info('ShopProductController: Attempting to update shop product.', ['shop_product_id' => $shopProduct->id, 'shop_id' => $shop->id, 'user_id' => Auth::id(), 'request_data' => $request->all()]);
         if ($shopProduct->shop_id !== $shop->id) {
@@ -350,11 +362,12 @@ class ShopProductController extends Controller
     }
 
     /**
-     * Remove the specified ShopProduct (de-list product from shop).
+     * Remove the specified ShopProduct (de-list product from the Shop).
+     * Ensures the ShopProduct belongs to the given Shop.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop
-     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The parent Shop.
+     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct The ShopProduct instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
     public function destroy(Request $request, Shop $shop, ShopProduct $shopProduct)
@@ -375,11 +388,13 @@ class ShopProductController extends Controller
     }
 
     /**
-     * Endpoint for shop admin to acknowledge/review master product changes.
+     * Allows a shop manager to acknowledge updates made to a MasterProduct.
+     * This clears the 'needs_review_by_shop' flag and potentially makes the product visible again.
+     * Ensures the ShopProduct belongs to the given Shop.
      *
-     * @param \Illuminate\Http\Request $request
-     * @param Shop $shop
-     * @param ShopProduct $shopProduct
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \IJIDeals\IJICommerce\Models\Shop  $shop The parent Shop.
+     * @param  \IJIDeals\IJIShopListings\Models\ShopProduct  $shopProduct The ShopProduct instance via route model binding.
      * @return \Illuminate\Http\JsonResponse
      */
     public function acknowledgeMasterProductUpdate(Request $request, Shop $shop, ShopProduct $shopProduct)

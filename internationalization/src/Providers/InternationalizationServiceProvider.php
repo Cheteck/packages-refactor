@@ -10,7 +10,7 @@ class InternationalizationServiceProvider extends ServiceProvider
     {
         // Register config
         $this->mergeConfigFrom(
-            __DIR__.'/../Config/internationalization.php',
+            __DIR__.'/../../config/internationalization.php',
             'internationalization'
         );
     }
@@ -18,9 +18,11 @@ class InternationalizationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Publish config
-        $this->publishes([
-            __DIR__.'/../Config/internationalization.php' => config_path('internationalization.php'),
-        ], 'config');
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../../config/internationalization.php' => config_path('internationalization.php'),
+            ], 'config'); // Standard 'config' tag
+        }
 
         // Load migrations
         $this->loadMigrationsFrom(__DIR__.'/../Database/migrations');

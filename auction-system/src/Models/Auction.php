@@ -4,8 +4,8 @@ namespace IJIDeals\AuctionSystem\Models;
 
 use IJIDeals\Analytics\Traits\HasHistory;
 use IJIDeals\AuctionSystem\Enums\AuctionStatusEnum;
-use IJIDeals\IJICommerce\Models\IJICommerce\Product;
-use IJIDeals\UserManagement\Models\User;
+use IJIDeals\IJICommerce\Models\IJICommerce\Product; // This needs to be configurable or an interface
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -225,7 +225,7 @@ class Auction extends Model
      */
     public function winner(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'winner_id');
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class), 'winner_id');
     }
 
     /**
@@ -325,6 +325,7 @@ class Auction extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        // Assuming this 'user_id' column on auctions table refers to the auction creator/seller
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class), 'user_id');
     }
 }

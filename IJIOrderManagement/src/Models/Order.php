@@ -74,7 +74,8 @@ class Order extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(config('ijicommerce.user_model', \App\Models\User::class), 'user_id');
+        // Directly use the centralized user model configuration
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class), 'user_id');
     }
 
     public function items(): HasMany

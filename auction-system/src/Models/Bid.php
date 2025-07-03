@@ -3,7 +3,7 @@
 namespace IJIDeals\AuctionSystem\Models;
 
 use IJIDeals\AuctionSystem\Enums\BidStatusEnum;
-use IJIDeals\UserManagement\Models\User;
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -175,7 +175,7 @@ class Bid extends Model
      */
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class));
     }
 
     /**

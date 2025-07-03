@@ -2,7 +2,7 @@
 
 namespace IJIDeals\Social\Models;
 
-use IJIDeals\UserManagement\Models\User;
+// use IJIDeals\UserManagement\Models\User; // Will use configured user model
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,7 +33,7 @@ class Follow extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('user-management.model', \App\Models\User::class));
     }
 
     /**

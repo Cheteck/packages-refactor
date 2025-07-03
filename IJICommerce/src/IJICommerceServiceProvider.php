@@ -6,10 +6,12 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use IJIDeals\IJICommerce\Models\Shop;
 use IJIDeals\IJICommerce\Policies\ShopPolicy;
-use IJIDeals\IJICommerce\Models\ShopProduct;
-use IJIDeals\IJICommerce\Policies\ShopProductPolicy;
-use IJIDeals\IJICommerce\Models\Order;
-use IJIDeals\IJICommerce\Policies\OrderPolicy;
+// Removed ShopProduct and ShopProductPolicy as they belong to IJIShopListings
+// use IJIDeals\IJICommerce\Models\ShopProduct;
+// use IJIDeals\IJICommerce\Policies\ShopProductPolicy;
+// Removed Order and OrderPolicy as they belong to IJIOrderManagement
+// use IJIDeals\IJICommerce\Models\Order;
+// use IJIDeals\IJICommerce\Policies\OrderPolicy;
 use Illuminate\Support\Facades\Log;
 
 class IJICommerceServiceProvider extends ServiceProvider
@@ -21,7 +23,7 @@ class IJICommerceServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Shop::class => ShopPolicy::class,
-        ShopProduct::class => ShopProductPolicy::class,
+        // ShopProduct::class => ShopProductPolicy::class, // Moved to IJIShopListingsServiceProvider
     ];
 
     /**
