@@ -1,0 +1,67 @@
+# TODO for Internationalization Package
+
+- [X] **License and Author:**
+    - [X] License is "proprietary". (Global instruction)
+    - [X] Update author email in `composer.json` from `dev@ijideals.com` to `contact@ijideals.com`.
+- [X] **PHP Version:**
+    - [X] Review PHP version requirement (`^8.1`) for standardization. (Kept ^8.1, illuminate/support standardized)
+- [ ] **CRITICAL: Resolve Conflicting Translation Strategies:**
+    - This package requires `astrotomic/laravel-translatable` but also implements a custom polymorphic translation system (`IsTranslatable` trait, `Translation` model, `translations` table config in `internationalization.php`). These are incompatible.
+    - **Decision Required:**
+        - **Option A (Recommended - Use `astrotomic/laravel-translatable` properly):**
+            - [ ] Remove the custom `IJIDeals\Internationalization\Models\Translation` model.
+            - [ ] Remove the custom `IJIDeals\Internationalization\Traits\IsTranslatable` trait.
+            - [ ] Remove `database.translations_table` and `database.morph_key` from `config/internationalization.php`.
+            - [ ] Other packages with translatable models (e.g., Catalog, Location) must then:
+                - Use `use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;` and `use Astrotomic\Translatable\Translatable;`
+                - Implement `TranslatableContract`.
+                - Define `public $translatedAttributes = ['name', 'description', ...];`.
+                - Create a specific translation model (e.g., `ProductTranslation`) and migration for each translatable entity.
+            - [ ] This package (`internationalization`) would then primarily provide: `Language` model, `TranslationService` (for auto-translation), `SetLocale` middleware, helpers, and language management API.
+        - **Option B (Use Custom Polymorphic System - More complex to maintain):**
+            - [ ] Remove `astrotomic/laravel-translatable` from this package's `composer.json`.
+            - [ ] Thoroughly test and document the custom `IsTranslatable` trait and `Translation` model.
+            - [ ] Ensure migrations create the necessary polymorphic `translations` table.
+- [ ] **CRITICAL: Standardize on a Single Model Translation Package Application-Wide:**
+    - Resolve the use of `astrotomic/laravel-translatable` (in this package and main app) AND `spatie/laravel-translatable` (in `location` package and main app).
+    - It's strongly recommended to use only one primary package for translating Eloquent model attributes. `astrotomic/laravel-translatable` is generally more robust for this.
+    - [ ] If `astrotomic` is chosen, refactor the `location` package (and any other usages of `spatie/laravel-translatable` for model attributes) to use `astrotomic`.
+- [ ] **Language Model (`Language.php`):**
+    - [ ] Address internal TODOs from the model file:
+        - `// TODO: Remove this model from app/Models...` - Confirm this is done.
+        - `// TODO: Create new package 'localization' for all language logic...` - Clarify if this is still planned or if the current package scope is sufficient.
+        - `// TODO: Use Localization\Traits\HasLanguages for language logic` - Implement or remove comment.
+    - [ ] Review the generic `translations()` HasMany relationship on the `Language` model. Clarify its purpose or remove if redundant with the chosen primary translation strategy.
+- [ ] **`TranslationService.php` (Auto-Translation):**
+    - [ ] Implement the actual API calls for Google, DeepL, and Azure translation providers.
+    - [ ] Add proper error handling and logging for API failures from these services.
+    - [ ] Ensure API keys and provider settings from `config/internationalization.php` are correctly used.
+    - [ ] Detail in README how to create custom translation providers if the bundled ones are not sufficient (as noted in existing TODO).
+- [ ] **`SetLocale.php` Middleware:**
+    - [ ] Enhance to support locale detection from URL prefix/segment (as mentioned in README) and/or `Accept-Language` header.
+    - [ ] Make the order of locale detection (URL, user preference, header, session, default) configurable.
+    - [ ] Ensure `User` model (from `user-management` package) has a `preferred_language` field and it's accessible.
+- [ ] **API Routes (`api.php`):**
+    - [ ] Implement the "translation management routes" mentioned in the TODO if direct API management of translations (especially for the custom system, if kept) is desired. This would involve creating a `TranslationController`.
+    - [ ] Ensure Scribe docs are complete for the Language Management API (existing TODO).
+- [ ] **Migrations:**
+    - [ ] **Action Required: Provide exact migration filenames.** Current `ls` output is incomplete (`... [omitted 2 descendants]`).
+    - [ ] Once filenames are known: Review migrations.
+        - If Option A (Astrotomic): This package should only have a migration for the `languages` table. Other packages handle their own `*_translations` tables.
+        - If Option B (Custom Polymorphic): This package needs migrations for `languages` and the polymorphic `translations` table.
+- [ ] **Configuration (`internationalization.php`):**
+    - [ ] The `database` section (`translations_table`, `morph_key`) is relevant only if the custom polymorphic system (Option B) is chosen. Remove if using Astrotomic (Option A).
+    - [ ] Review and test usage of all config values (e.g., date/number formats from `localization` section by `LocalizationHelper`).
+- [ ] **README & General Documentation:**
+    - [ ] Update README extensively based on the chosen translation strategy.
+    - [ ] Document how to make a model translatable (either using Astrotomic or the custom trait).
+    - [ ] Document usage of `TranslationService`, `SetLocale` middleware, and any helpers.
+    - [ ] Document the Language Management API endpoints.
+    - [ ] Remove or address all existing TODOs in the README (some are covered by items above, e.g., "Route Localization" example, "Caching & Fallback" explanation).
+- [ ] **Testing:**
+    - [ ] Write tests for `Language` model CRUD via API.
+    - [ ] Test the chosen translation mechanism thoroughly (either Astrotomic integration or custom trait).
+    - [ ] Test `TranslationService` (mocking external API calls).
+    - [ ] Test `SetLocale` middleware with different scenarios (user pref, header, default).
+    - [ ] Test any helper functions (`LocalizationHelper`, `RouteLocalizationHelper`).
+    - [ ] Expand on testing for auto-translation services (existing TODO).

@@ -1,0 +1,32 @@
+{
+    "name": "ijideals/virtualcoin",
+    "description": "Virtual coin system for IJIDeals platform",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0",
+        "illuminate/database": "^10.0|^11.0",
+        "ijideals/user-management": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\VirtualCoin\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\VirtualCoin\\Providers\\VirtualCoinServiceProvider"
+            ]
+        }
+    }
+}

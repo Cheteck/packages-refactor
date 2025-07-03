@@ -1,0 +1,39 @@
+{
+    "name": "ijideals/ijiordermanagement",
+    "description": "Laravel package for managing e-commerce orders.",
+    "type": "laravel-package",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0|^8.1|^8.2|^8.3",
+        "illuminate/support": "^9.0|^10.0|^11.0",
+        "illuminate/database": "^9.0|^10.0|^11.0",
+        "illuminate/routing": "^9.0|^10.0|^11.0",
+        "ijideals/ijicommerce": "*",
+        "ijideals/ijishoplistings": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\IJIOrderManagement\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "IJIDeals\\IJIOrderManagement\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\IJIOrderManagement\\IJIOrderManagementServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

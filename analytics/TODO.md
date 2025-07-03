@@ -1,0 +1,46 @@
+# TODO for Analytics Package
+
+- [ ] **License and Author:**
+    - [X] License "proprietary" is correct.
+    - [X] Author "IJIDeals", email "contact@ijideals.com" is correct.
+- [ ] **PHP Version:**
+    - [ ] Review PHP version requirement (`^8.1`) for standardization.
+- [ ] **CRITICAL: Implement Core Logic & Missing Components:**
+    - [ ] **`RecordViewJob::handle()`:** Implement the logic to actually save `TrackableView` records using `$this->trackable->views()->create($this->data);`.
+    - [ ] **Create `AggregateAnalyticsJob`:** This job, mentioned in the README, is essential for populating `TrackableStatsDaily` from `TrackableView` and `TrackableInteraction` data. Define its logic (e.g., daily aggregation, batch processing).
+- [ ] **CRITICAL: Migrations:**
+    - [ ] **Action Required: Locate and list migration files.** The `AnalyticsServiceProvider` attempts to load them from `../../database/migrations`. Verify this path and list the files. If they don't exist, they need to be created.
+    - [ ] Ensure migrations exist for `activity_logs`, `trackable_views`, `trackable_interactions`, and `trackable_stats_daily` tables and that their schemas match the model properties and relationships.
+    - [ ] Ensure `AnalyticsServiceProvider` correctly loads and publishes these migrations.
+- [X] **Dependencies:**
+    - [X] Add `ijideals/user-management` to `composer.json` as models depend on its `User` model.
+    - [ ] **Decouple `TrackableStats` Trait:**
+        - The trait currently dispatches `NewInteraction` event and `HighEngagementNotification` from `ijideals/social`, and checks `instanceof Shop` from `ijideals/commerce`.
+        - **Option A (Tighter Coupling):** If this tight coupling is acceptable, add `ijideals/social` and `ijideals/commerce` as `suggests` or `require` in `composer.json`. This will be done for now.
+        - **Option B (Loose Coupling - Recommended):** Modify the trait to dispatch generic events (e.g., `AnalyticsInteractionRecorded`, `AnalyticsHighEngagementDetected`) that this package defines. Other packages (`social`, `commerce`) can then listen to these generic events if needed. For `instanceof Shop` check, consider using a common interface like `HighlyEngageable` that relevant models can implement.
+- [ ] **README Accuracy & Content:**
+    - [ ] **Rewrite "Models" and "Features" sections:** The latter half of the README contains generic placeholder lists. Remove these and accurately describe the *actual* models (`ActivityLog`, `TrackableView`, `TrackableInteraction`, `TrackableStatsDaily`) and features of *this* analytics package.
+    - [ ] Ensure "Key Components" in README includes `TrackableView` model and correctly lists the `AggregateAnalyticsJob` once created.
+    - [ ] Standardize trait name: `TrackableStats` (actual trait name). Choose one and update README and code comments accordingly.
+    - [ ] Clarify the "Event Tracking" API mentioned in README (`Analytics::track(...)`). Is there a Facade or helper class for this? If so, document its usage. If not, implement it or clarify how events are logged to `ActivityLog`.
+    - [ ] Elaborate on "custom reports" and "data export" features if they are part of this package's scope, or remove if they are not (existing TODO item).
+    - [ ] Add more details on how other packages should fire events for this package to consume (for `ActivityLog`) (existing TODO item).
+- [ ] **Configuration (`analytics.php`):**
+    - [ ] Populate `config/analytics.php` with relevant settings:
+        - Cache TTLs for stats (e.g., used in `TrackableStats` trait: `view_dedupe_minutes`, `interaction_cache_hours`).
+        - Configuration for `RecordViewJob` (e.g., queue connection/name).
+        - Configuration for `AggregateAnalyticsJob` (e.g., frequency, batch size).
+        - Feature flags (e.g., enable/disable certain types of tracking).
+    - [ ] Document configuration options in more detail in the README (existing TODO item).
+- [ ] **Models - General:**
+    - [ ] Address internal `// TODO:` comments in model files (`TrackableInteraction`, `TrackableStatsDaily`, `TrackableView`) regarding refactoring/moving.
+    - [ ] `ActivityLog::getParentModel()`: Consider making the parent model detection more flexible (e.g., via an interface on loggable models or a configurable mapping) rather than hardcoded relationship names.
+- [ ] **API & Routes:**
+    - [ ] Evaluate if any analytics data needs to be exposed via API endpoints. If so, create necessary controllers and routes, and document them.
+- [ ] **Testing:**
+    - [ ] Write unit tests for all models, traits, and jobs.
+    - [ ] Test `RecordViewJob` (ensuring it creates `TrackableView` records).
+    - [ ] Test `AggregateAnalyticsJob` once created.
+    - [ ] Test caching mechanisms in `TrackableStats` trait.
+    - [ ] Test `HasHistory` trait logic.
+    - [ ] Add testing strategy details to README (existing TODO item).

@@ -1,0 +1,632 @@
+openapi: 3.0.0
+info:
+  title: IJICommerce API (Phase 1 & Early Phase 2)
+  version: v0.2.0
+  description: API for managing Shops, Shop Teams, Product Proposals, Brands, and Categories.
+  contact:
+    name: IJIDeals
+    email: contact@ijideals.com
+
+servers:
+  - url: http://localhost/api/ijicommerce # Replace with your actual base URL + package route_prefix
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth: # Can be named anything
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum # Or JWT, etc.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /shops:
+    get:
+      summary: List shops accessible to the user
+      tags:
+        - Shops
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A paginated list of shops.
+          content:
+            application/json: {} # Schema to be defined
+    post:
+      summary: Create a new shop
+      tags:
+        - Shops
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "My New Shop"
+                description:
+                  type: string
+                  nullable: true
+                contact_email:
+                  type: string
+                  format: email
+                  nullable: true
+                # ... other shop fields from Shop model ...
+      responses:
+        '201':
+          description: Shop created successfully.
+        '401':
+          description: Unauthenticated.
+        '403':
+          description: Unauthorized (User cannot create shops).
+        '422':
+          description: Validation error.
+
+  /shops/{shopId}:
+    get:
+      summary: Get a specific shop's details
+      tags:
+        - Shops
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          description: ID of the shop
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Shop details.
+        '403':
+          description: Unauthorized to view this shop.
+        '404':
+          description: Shop not found.
+    put:
+      summary: Update a specific shop
+      tags:
+        - Shops
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                # ... other updatable shop fields ...
+      responses:
+        '200':
+          description: Shop updated successfully.
+        '403':
+          description: Unauthorized to update this shop.
+    delete:
+      summary: Delete a specific shop
+      tags:
+        - Shops
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Shop deleted successfully.
+        '403':
+          description: Unauthorized to delete this shop.
+
+  /shops/{shopId}/team:
+    get:
+      summary: List team members of a shop
+      tags:
+        - Shop Team
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of team members with their roles in the shop.
+        '403':
+          description: Unauthorized.
+
+  /shops/{shopId}/team/users:
+    post:
+      summary: Add a user to the shop's team
+      tags:
+        - Shop Team
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "member@example.com"
+                role:
+                  type: string
+                  example: "Editor"
+      responses:
+        '200':
+          description: User added to team.
+        '403':
+          description: Unauthorized.
+        '422':
+          description: Validation error (e.g., user not found, role not found).
+
+  /shops/{shopId}/team/users/{userId}:
+    put:
+      summary: Update a user's role in the shop team
+      tags:
+        - Shop Team
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  example: "Administrator"
+      responses:
+        '200':
+          description: User role updated.
+        '403':
+          description: Unauthorized.
+    delete:
+      summary: Remove a user from the shop team
+      tags:
+        - Shop Team
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User removed from team.
+        '403':
+          description: Unauthorized.
+
+  /product-proposals:
+    get:
+      summary: List product proposals submitted by the user's shops
+      tags:
+        - Product Proposals (Shop Side)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Paginated list of product proposals.
+    post:
+      summary: Submit a new product proposal for a shop
+      tags:
+        - Product Proposals (Shop Side)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shop_id:
+                  type: integer
+                name:
+                  type: string
+                description:
+                  type: string
+                # ... other product proposal fields ...
+      responses:
+        '201':
+          description: Product proposal submitted.
+        '403':
+          description: Unauthorized to submit for this shop.
+
+  /product-proposals/{productProposalId}:
+    get:
+      summary: Get details of a specific product proposal
+      tags:
+        - Product Proposals (Shop Side)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productProposalId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Product proposal details.
+        '403':
+          description: Unauthorized.
+
+  # PLATFORM ADMIN ROUTES
+  /admin/brands:
+    get:
+      summary: List all brands (Admin)
+      tags:
+        - Admin - Brands
+      security:
+        - bearerAuth: [] # Should have admin-specific auth
+      responses:
+        '200':
+          description: Paginated list of brands.
+    post:
+      summary: Create a new brand (Admin)
+      tags:
+        - Admin - Brands
+      security:
+        - bearerAuth: []
+      requestBody:
+        # ... schema for brand creation ...
+        content: {}
+      responses:
+        '201':
+          description: Brand created.
+
+  /admin/brands/{brandId}:
+    get:
+      summary: Get a specific brand (Admin)
+      tags:
+        - Admin - Brands
+      # ... parameters, responses ...
+      parameters: []
+      responses: {}
+    put:
+      summary: Update a brand (Admin)
+      tags:
+        - Admin - Brands
+      # ... parameters, requestBody, responses ...
+      parameters: []
+      requestBody: {}
+      responses: {}
+    delete:
+      summary: Delete a brand (Admin)
+      tags:
+        - Admin - Brands
+      # ... parameters, responses ...
+      parameters: []
+      responses: {}
+
+  /admin/categories:
+    get:
+      summary: List all categories (Admin)
+      tags:
+        - Admin - Categories
+      security:
+        - bearerAuth: [] # Should have admin-specific auth
+      responses:
+        '200':
+          description: Paginated list of categories.
+    post:
+      summary: Create a new category (Admin)
+      tags:
+        - Admin - Categories
+      security:
+        - bearerAuth: []
+      requestBody:
+        # ... schema for category creation ...
+        content: {}
+      responses:
+        '201':
+          description: Category created.
+
+  /admin/categories/{categoryId}:
+    get:
+      summary: Get a specific category (Admin)
+      tags:
+        - Admin - Categories
+      # ... parameters, responses ...
+      parameters: []
+      responses: {}
+    put:
+      summary: Update a category (Admin)
+      tags:
+        - Admin - Categories
+      # ... parameters, requestBody, responses ...
+      parameters: []
+      requestBody: {}
+      responses: {}
+    delete:
+      summary: Delete a category (Admin)
+      tags:
+        - Admin - Categories
+      # ... parameters, responses ...
+      parameters: []
+      responses: {}
+
+# TODO: Add more details like request/response schemas for each endpoint.
+# TODO: Add admin endpoints for ProductProposals (listing all, approving, rejecting). - Partially Done
+# TODO: Add admin endpoints for MasterProducts. - Partially Done
+
+  /admin/product-proposals:
+    get:
+      summary: List all product proposals for admin review
+      tags:
+        - Admin - Product Proposals
+      parameters:
+        - name: status
+          in: query
+          description: Filter by status (e.g., pending, approved, rejected)
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of product proposals.
+
+  /admin/product-proposals/{productProposalId}:
+    get:
+      summary: Get a specific product proposal (Admin)
+      tags:
+        - Admin - Product Proposals
+      parameters:
+        - name: productProposalId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Product proposal details.
+
+  /admin/product-proposals/{productProposalId}/approve:
+    post:
+      summary: Approve a product proposal (Admin)
+      tags:
+        - Admin - Product Proposals
+      parameters:
+        - name: productProposalId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        description: Admin can override proposal data here before creating MasterProduct.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                # ... other master product fields admin can set/override ...
+                status: { type: string, enum: [active, draft_by_admin] }
+      responses:
+        '201':
+          description: Proposal approved, MasterProduct created.
+
+  /admin/product-proposals/{productProposalId}/reject:
+    post:
+      summary: Reject a product proposal (Admin)
+      tags:
+        - Admin - Product Proposals
+      parameters:
+        - name: productProposalId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin_notes: { type: string, description: "Reason for rejection" }
+      responses:
+        '200':
+          description: Proposal rejected.
+
+  /admin/master-products:
+    get:
+      summary: List all master products (Admin)
+      tags:
+        - Admin - Master Products
+      responses:
+        '200':
+          description: Paginated list of master products.
+    post:
+      summary: Create a new master product directly (Admin)
+      tags:
+        - Admin - Master Products
+      requestBody:
+        # ... schema for master product creation ...
+        content: {}
+      responses:
+        '201':
+          description: Master product created.
+
+  /admin/master-products/{masterProductId}:
+    get:
+      summary: Get a specific master product (Admin)
+      tags:
+        - Admin - Master Products
+      parameters: []
+      responses: {}
+    put:
+      summary: Update a master product (Admin)
+      tags:
+        - Admin - Master Products
+      parameters: []
+      requestBody: {}
+      responses: {}
+    delete:
+      summary: Delete a master product (Admin)
+      tags:
+        - Admin - Master Products
+      parameters: []
+      responses: {}
+
+  # Shop Product Listings
+  /shops/{shopId}/shop-products/available-master:
+    get:
+      summary: List master products available for a shop to sell
+      tags:
+        - Shop Product Listings
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list of available master products.
+
+  /shops/{shopId}/shop-products:
+    get:
+      summary: List products currently sold by the shop
+      tags:
+        - Shop Product Listings
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list of shop's product listings.
+    post:
+      summary: Add a master product to the shop's listings ("Sell This")
+      tags:
+        - Shop Product Listings
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                master_product_id: { type: integer }
+                price: { type: number, format: float }
+                stock_quantity: { type: integer }
+                # ... other shop_product fields ...
+      responses:
+        '201':
+          description: Product added to shop.
+
+  /shops/{shopId}/shop-products/{shopProductId}:
+    get:
+      summary: Get a specific shop product listing
+      tags:
+        - Shop Product Listings
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: shopProductId # Corrected from shopProduct
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Shop product listing details.
+    put:
+      summary: Update a shop product listing
+      tags:
+        - Shop Product Listings
+      # ... parameters, requestBody, responses ...
+      parameters: []
+      requestBody: {}
+      responses: {}
+    delete:
+      summary: Remove a product listing from the shop
+      tags:
+        - Shop Product Listings
+      # ... parameters, responses ...
+      parameters: []
+      responses: {}
+
+  /shops/{shopId}/shop-products/{shopProductId}/acknowledge-update:
+    post:
+      summary: Shop acknowledges master product update
+      tags:
+        - Shop Product Listings
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: shopProductId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Master product changes acknowledged.
+
+# TODO: Define reusable components for request bodies and responses.
+# TODO: Clearly define security requirements for admin routes.

@@ -1,0 +1,70 @@
+# TODO for Social Package
+
+- [X] **License and Author:**
+    - [X] Update `composer.json`: set license to "proprietary".
+    - [X] Update `composer.json`: set author to "IJIDeals" and email to "contact@ijideals.com" (from "Your Name").
+- [X] **PHP Version & Dependencies:**
+    - [X] PHP version is `^8.2`. Standardize with other packages (mostly `^8.1`) or document the reason. (Standardized to ^8.1)
+    - [X] **CRITICAL: Add Missing Dependencies to `composer.json`:**
+        - [X] `ijideals/user-management` (used by nearly all models).
+        - [X] `spatie/laravel-medialibrary: ^10.0` (or appropriate version, used by `Post` model).
+        - [X] `ijideals/file-management` (if `Post->attachments()` uses it; clarify if Spatie MediaLibrary replaces this need for Posts, or if `attachments` is for non-Spatie files).
+        - [X] `ijideals/analytics` (for `TrackableStats` trait used in `Post`).
+        - [X] `ijideals/commerce` (for `Product` model used in `Post`).
+        - [X] `ijideals/messaging` (for `Conversation` model used in `Group`).
+- [ ] **Namespace Standardization & Usage:**
+    - [X] PSR-4 namespace `IJIDeals\\Social\\` is good.
+    - [ ] Correct internal `use` statements in models (e.g., `Post.php` uses `App\Enums\*`) to point to package-local enums/models or enums/models from other `ijideals` packages.
+- [ ] **CRITICAL: Clarify Follow vs. Friendship System:**
+    - [ ] `Friendship` model (with statuses: pending, accepted, blocked) suggests a two-way friend request system.
+    - [ ] `create_follows_table.php` migration (for `follower_id`, `followed_id`) suggests a one-way user-to-user follow system. The `Follow` model (mentioned in `SocialServiceProvider` but not yet read) likely maps to this `follows` table.
+    - [ ] `HasFollowers` trait supports polymorphic "followables" (e.g., users following a Shop or a Group) and a specific `shop_followers` table (hardcoded path to `App\Models\Shop` needs fixing).
+    - **Decision Required:**
+        - Define the intended social connection model(s): Are "follows" (one-way, user-user, user-entity) and "friendships" (two-way user-user, request-based) separate features?
+        - If so, ensure models (`Follow`, `Friendship`), tables (`follows`, `friendships`, polymorphic `follows`), and traits (`HasFollowers`) align clearly with each distinct feature.
+        - If only one system is intended, refactor to use it consistently.
+- [ ] **CRITICAL: Clarify Reactions vs. Likes System:**
+    - [ ] `Reaction` model uses `interactions` table (as per model's `$table` property).
+    - [ ] `create_likes_table.php` migration exists.
+    - [ ] API routes for "likes" are specific (`POST posts/{post}/likes`).
+    - **Decision Required:**
+        - Are "likes" just one type of "reaction" stored in the `interactions` table (Reaction model's table) with `type='like'`? If so, the `likes` table/migration is redundant and should be removed. API routes should then be generalized for reactions if needed (e.g. `POST posts/{post}/reactions`).
+        - Or, is there a simple "like" system (using `likes` table) AND a more complex generic "reaction" system (using `interactions` table)? Clarify and ensure models/routes align. The `Reaction` model seems designed for generic reactions.
+- [ ] **Configuration:**
+    - [ ] Create `config/social.php`.
+    - [ ] Add settings for: default post visibility (`public`, `restricted`, `private`), configurable reaction types (e.g., `['like', 'love', 'haha', 'wow', 'sad', 'angry']`), notification preferences, feed algorithm parameters (if any), content moderation flags, Group/Event default settings.
+    - [ ] Update `SocialServiceProvider` to merge and publish this config file. (Existing TODO item in SP comments).
+- [ ] **Model-Specific Refinements:**
+    - **`Post.php`:**
+        - Media Handling: `Post` uses Spatie MediaLibrary (`HasMedia`, `InteractsWithMedia`). It also has an `attachments()` MorphMany relationship to `Attachment` model (presumably from `ijideals/file-management`). Clarify if both are needed for posts, or if Spatie MediaLibrary should handle all post media. If Spatie handles all, remove the `attachments()` relation or repurpose it (e.g., for non-image/video file attachments if MediaLibrary is configured only for images/videos).
+        - `getReactionSummary()`: Implement the `reactions()` method (likely from `HasReaction` trait; ensure trait provides this method and it queries the correct table - `interactions` or `likes` based on decision above).
+        - `toggleReaction()`: Depends on `hasUserReaction()` and `removeReaction()` / `addReaction()` from traits. Ensure these are correctly implemented in `HasReaction` / `CanReact` traits and interact with the correct reaction storage.
+    - **`HasFollowers` Trait:**
+        - [ ] Replace hardcoded `\App\Models\Shop` with `IJIDeals\IJICommerce\Models\Shop` or a relevant interface to avoid direct app dependency.
+        - [ ] Clarify the polymorphic `follows` table name used by this trait vs. the direct `follows` table for user-user.
+- [ ] **Migrations & Database:**
+    - [ ] **Action Required: List all migration files** from `database/migrations/` to get a full picture (e.g., for groups, events, hashtags, reactions/interactions table, friendships, activity, etc.).
+    - [ ] Review all migrations for correctness, consistency (e.g., polymorphic vs. direct foreign keys for `author_id` on `Post`), and relations. For example, `create_posts_table.php` uses polymorphic `author_id`, `author_type`.
+- [ ] **Policies & Authorization:**
+    - [ ] `PostPolicy`, `CommentPolicy` exist. Review for completeness and ensure they are used in controllers.
+    - [ ] Create and implement Policies for `Group`, `Event`, `Reaction`, `Follow/Friendship`, `Notification`.
+    - [ ] Ensure all controller actions use policy methods for authorization.
+- [ ] **API Routes & Controllers:**
+    - [ ] **Action Required: Read Controller files** (e.g., `PostController`, `CommentController`, `LikeController`, `FollowController`, `NotificationController`, and any for Group/Event) to analyze their logic, request handling, and validation.
+    - [ ] If reactions are generic, reaction routes might need to be polymorphic rather than just `posts/{post}/likes`.
+- [ ] **README & Documentation:**
+    - [ ] Merge/streamline "Key Features" and "Core Features" (existing TODO).
+    - [ ] Specify media types supported for posts (existing TODO).
+    - [ ] Detail how reactions are configured/used (existing TODO).
+    - [ ] Explain hashtag parsing/linking (existing TODO).
+    - [ ] Elaborate on Group and Event functionalities, including their models and API interactions (existing TODO).
+    - [ ] Describe the Reporting System (`Report` model exists) and its workflow (existing TODO).
+    - [ ] Provide more usage examples for traits (existing TODO).
+    - [ ] Update dependencies list in README.
+    - [ ] Ensure Scribe documentation is complete (existing TODO).
+- [ ] **Testing (`PostApiTest.php`):**
+    - [ ] Expand tests significantly to cover all social interactions: posts, comments, reactions, follows/friendships, groups, events, notifications.
+    - [ ] Test all API endpoints, policies, and validation rules.
+    - [ ] Add specific testing strategies for social graph interactions and feed generation (existing TODO).
+
+This package has a strong foundation but requires careful attention to its complex interactions, dependency management, and consistent implementation of its various social features, especially around follows/friendships and reactions/likes. Clarifying the data models for these is key.

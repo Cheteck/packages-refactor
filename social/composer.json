@@ -1,0 +1,39 @@
+{
+    "name": "ijideals/social",
+    "description": "IJIDeals Social Package",
+    "type": "laravel-package",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0",
+        "ijideals/user-management": "*",
+        "spatie/laravel-medialibrary": "^10.0|^11.0",
+        "ijideals/file-management": "*",
+        "ijideals/analytics": "*",
+        "ijideals/ijicommerce": "*",
+        "ijideals/messaging": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\Social\\": "src/",
+            "IJIDeals\\Social\\Database\\Factories\\": "database/factories/",
+            "IJIDeals\\Social\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\Social\\Providers\\SocialServiceProvider"
+            ],
+            "aliases": {}
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

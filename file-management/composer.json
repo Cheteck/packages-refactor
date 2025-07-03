@@ -1,0 +1,32 @@
+{
+    "name": "ijideals/file-management",
+    "description": "File management package for IJIDeals platform",
+    "type": "library",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\FileManagement\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0",
+        "league/flysystem": "^3.0",
+        "intervention/image": "^2.0|^3.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\FileManagement\\Providers\\FileManagementServiceProvider"
+            ]
+        }
+    }
+}

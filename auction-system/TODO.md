@@ -1,0 +1,73 @@
+# TODO for Auction System Package
+
+- [ ] **License and Author:**
+    - [X] License "proprietary" is correct.
+    - [X] Author "IJIDeals", "contact@ijideals.com" is correct.
+- [ ] **PHP Version:**
+    - [ ] Review PHP version requirement (`^8.1`) for standardization.
+- [ ] **CRITICAL: Implement Core Logic & Missing Components:**
+    - **Services:**
+        - [ ] Create `AuctionService` in `src/Services/` to manage:
+            - Auction creation and validation (e.g., start/end dates, pricing).
+            - Bid placement: validation (bid amount > current + increment, user eligibility, auction active status, user not outbidding self unless necessary for auto-bid).
+            - Updating `Auction->current_price` upon valid new bid.
+            - Handling `auto_bid` logic if a new bid triggers outbidding by an existing auto-bidder up to their `max_amount`.
+            - Anti-sniping logic (extending `Auction->end_date` if a bid is placed near end time, if `Auction->auto_extend` is true).
+            - Triggering winner determination process (can be called by scheduled job).
+    - **Events:**
+        - [ ] Create `Events/NewBidPlaced.php` event (dispatched by `AuctionService` after a valid bid). This event should be broadcastable for real-time updates and contain `auction_id`, new `current_price`, `bidder_id`, `bid_amount`.
+        - [ ] Create `Events/AuctionEnded.php` event (dispatched by scheduled job after an auction concludes). This event should contain `auction_id`, `winner_id` (if any), `winning_bid_amount` (if any), `status`.
+    - **Jobs:**
+        - [ ] Create `Jobs/DetermineAuctionWinnerJob.php` (schedulable command, e.g., runs every minute):
+            - Finds auctions where `end_date` has passed and status is still 'active'.
+            - Determines the winner (highest valid bid meeting `reserve_price` if set).
+            - Updates `Auction->winner_id` and `Auction->status` (e.g., to 'sold', 'ended_no_winner', 'ended_reserve_not_met').
+            - Dispatches `AuctionEnded` event.
+    - **Order Creation Listener:**
+        - [ ] Create a listener (e.g., `Listeners/CreateOrderFromWinningBid.php`) for the `AuctionEnded` event.
+        - [ ] This listener should check if `AuctionEnded->status` is 'sold' (or similar indicating a successful sale).
+        - [ ] Interact with `ijideals/commerce`'s `OrderService` to create an order for the winning bidder.
+- [ ] **CRITICAL: Create Migrations & Factories:**
+    - [ ] **Create Migrations** in `database/migrations/` (package root, then adjust SP path to `../../database/migrations`):
+        - `create_auctions_table.php`: Based on `Auction.php` model fields (`product_id` (FK to `products` table, likely from `commerce` package), `starting_price`, `current_price`, `reserve_price`, `increment_amount`, `start_date`, `end_date`, `status`, `winner_id` (nullable FK to `users`), `creator_id` (or `user_id`, FK to `users`), `auto_extend`, `extension_time`, etc.). Include foreign keys.
+        - `create_bids_table.php`: Based on `Bid.php` model fields (`auction_id` (FK), `user_id` (FK), `amount`, `auto_bid` (boolean), `max_amount` (nullable decimal for auto-bids), `outbid` (boolean), `outbid_by_id` (nullable FK to `bids` table for self-reference), `status`, `ip_address`, `user_agent`). Include foreign keys.
+    - [ ] Ensure `AuctionSystemServiceProvider` correctly loads and publishes these migrations. (Current SP path `../../database/migrations` implies `database` dir at package root).
+    - [ ] Create Model Factories for `Auction` and `Bid` for testing in `database/factories/`.
+- [X] **Dependencies in `composer.json`:**
+    - [X] Add `ijideals/user-management` (for `Auction->winner`, `Bid->user`, auction creator).
+    - [X] Add `ijideals/commerce` (for `Auction->product` and for creating orders from winning bids).
+    - [X] Add `ijideals/analytics` (as `Auction` model uses `HasHistory` trait).
+- [ ] **Configuration (`src/Config/auction-system.php`):**
+    - [ ] The Service Provider loads from `src/Config/auction-system.php`. This is fine for internal config. If user-configurable, ensure it's published to the app's `config` dir correctly.
+    - [ ] Populate with settings:
+        - Default auction duration.
+        - Anti-sniping settings (enabled by default, extension_time_minutes).
+        - Default bid increment rules/strategies (e.g., percentage of current price, or fixed amount tiers).
+        - Supported auction types (e.g., 'english', 'sealed') and their specific rule configurations.
+        - Notification settings (for outbid, auction ending soon, auction won notifications).
+        - Laravel Echo channel naming conventions for broadcasting `NewBidPlaced`.
+- [ ] **Model Refinements:**
+    - **`Auction.php`:**
+        - Clarify the `user()` relationship: Is it for the auction creator/owner? If so, rename to `creator()` or `owner()` for clarity, and ensure a corresponding `creator_id` (or similar FK) is in `fillable` and the migration.
+    - **Missing Models from README's second list:** Evaluate if `AuctionItem` (if an auction can have multiple items), `AuctionRule`, `AuctionParticipant`, `AutoBid` (beyond current fields in `Bid`), `AuctionPayment`, `AuctionDispute` are needed for the target feature set. If so, plan their implementation. The current `Auction` model seems tied to a single `product_id`.
+- [ ] **API Endpoints & Routes:**
+    - [ ] If auctions are managed or bids placed via API:
+        - Create `routes/api.php` at package root (Service Provider expects this path for loading).
+        - Create `AuctionController`, `BidController` in `src/Http/Controllers/`.
+        - Implement Form Requests for validation in `src/Http/Requests/`.
+        - Implement Policies for authorization (e.g., who can create auctions, who can bid, who can view bid history).
+- [ ] **README Accuracy:**
+    - [ ] Update "Models" list in "Key Components" to reflect implemented models (Auction, Bid). Clarify or remove the longer, second "Models" list if those are not implemented.
+    - [ ] Detail setup for Laravel Echo for real-time bid updates.
+    - [ ] Explain different auction types if supported and how they are configured/work.
+    - [ ] Document the role of the scheduled job for winner determination.
+- [ ] **PHPStan:**
+    - [ ] `Bid.phpstan-result.json` exists. Ensure analysis is run and issues addressed. Remove this file from version control.
+- [ ] **Testing:**
+    - [ ] Write unit tests for `AuctionService` (bid placement, auto-bidding logic, anti-sniping, winner determination).
+    - [ ] Test model relationships, scopes, and helper methods.
+    - [ ] Test event dispatching (`NewBidPlaced`, `AuctionEnded`) and the listener for order creation.
+    - [ ] Test scheduled job functionality for `DetermineAuctionWinnerJob`.
+    - [ ] Test API endpoints and policies if implemented.
+
+This package has a good model foundation (Auction, Bid) but requires significant work on services, jobs, events, and migrations to be functional. The immediate action is to create the migrations and ensure the Service Provider can load them. The path for migrations in the SP (`../../database/migrations`) implies the `database` directory should be at the root of the `auction-system` package, not inside `src`. This needs to be consistent.

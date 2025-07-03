@@ -1,0 +1,62 @@
+# TODO for Pricing Package
+
+- [ ] **License and Author:**
+    - [X] License "proprietary" is correct.
+    - [X] Author "IJIDeals", "contact@ijideals.com" is correct.
+- [X] **PHP Version:**
+    - [X] Review PHP version requirement (`^8.1`) for standardization. (Standardized)
+- [X] **CRITICAL: Implement Core Package Components (Models, Services):**
+    - Based on the README, the following core components need to be created/verified (Only `Currency.php` is currently visible):
+    - **Models:**
+        - [X] `Price`: To store price amounts, currency, and link to a priceable model (polymorphic: product, variant, subscription plan, etc.). (Created)
+        - [X] `Discount`: To define promotions. (Created)
+        - [X] `DiscountRule`: Conditions for a discount to apply. (Created)
+        - [X] `DiscountUsage`: To track usage of discounts. (Created)
+        - [ ] `PriceHistory`: (From README) To log changes to prices.
+        - [ ] `ExchangeRate`: (From README) If managing exchange rates internally beyond `Currency->exchange_rate`. Could store historical rates.
+        - [ ] `PricingTier`: (From README) For tiered pricing based on user roles or membership.
+        - [ ] `TaxRate`: (From README) For more complex tax rules than the simple default in config.
+    - **Services:**
+        - [X] `PricingService`: Central service for: (Initial version created)
+            - Calculating final price of an item or cart (applying discounts, taxes).
+            - Managing active discounts and promotions.
+            - Handling currency conversions.
+            - Applying tiered pricing.
+    - **Action Required:** Use `ls` to check `packages/ijideals/pricing/src/Models/` and `src/Services/` for existing files. If they exist, analyze them. If not, they need to be created. (Done for core models and service)
+- [X] **CRITICAL: Create Migrations & Factories:**
+    - [X] Create migrations for all necessary tables: `currencies` (exists), `prices`, `discounts`, `discount_rules`, `discount_usage`. (Created for new models)
+    - [X] Ensure `PricingServiceProvider` correctly loads migrations from `Database/migrations/`. (Provider updated, path adjusted)
+    - [ ] Create model factories for testing.
+    - **Action Required:** Use `ls packages/ijideals/pricing/Database/migrations/` and `ls packages/ijideals/pricing/Database/factories/` to check for existing files. (Migrations created)
+- [X] **Dependencies in `composer.json`:**
+    - [X] Add `ijideals/user-management` (for user-specific/role-based pricing as per README).
+    - [X] Add `ijideals/commerce` (for applying discounts to carts, pricing products within orders as per README).
+    - [ ] Clarify the necessity of `ijideals/inventory` dependency. If for stock-based pricing rules, document this. (Removed from composer.json for now, as primary dependencies are user-management and commerce).
+- [ ] **Configuration (`Config/pricing.php`):**
+    - [ ] The existing config file is a good start. Ensure its values (`currency`, `price_precision`, `tax.*`, `discounts.*`) are actively used by the `PricingService` and models once implemented.
+    - [ ] Expand config if needed for tiered pricing, scheduled promotions, or specific discount rule parameters.
+    - [ ] Document any configuration options in the README (existing TODO item).
+- [ ] **README Accuracy & Content:**
+    - [ ] Reconcile "Key Components" model list with the more detailed second "Models" list in README, and align with the actual implementation once models are created/verified.
+    - [ ] Clearly document how other packages (Catalog, Commerce, User Management) interact with this package.
+    - [ ] Detail how "Multi-Currency Support" and exchange rates are managed and updated (existing TODO item).
+    - [ ] Explain the "Discount Engine" and "Tiered Pricing" in more depth, including how rules and conditions are configured and evaluated by `PricingService` (existing TODO item).
+    - [ ] Explain how "Scheduled Promotions" are implemented (e.g., using Laravel's scheduler?) (existing TODO item).
+- [ ] **Implement Core Features (in Service/Models):**
+    - [ ] Multi-Currency Support (extend `Currency` model, ensure `PricingService` handles conversions).
+    - [ ] Price Management (implement `Price` model and its relation to priceable items).
+    - [ ] Discount Engine (implement `Discount`, `DiscountRule` models, and complex logic in `PricingService`).
+    - [ ] Tiered Pricing logic.
+    - [ ] Scheduled Promotions.
+- [ ] **API Endpoints & Routes (`routes/api.php`):**
+    - [ ] The `api.php` is currently empty. Determine if any pricing entities (e.g., managing currencies, discount codes) require direct API management. If so, create controllers, routes, Form Requests, and Policies.
+- [ ] **Testing:**
+    - [ ] Write unit tests for `PricingService` (complex calculations, discount application, currency conversion, tax logic).
+    - [ ] Test model relationships and scopes for all created models.
+    - [ ] Test any API endpoints if created.
+    - [ ] Test scheduled promotion activation/deactivation.
+    - [ ] Add testing strategy details to README (existing TODO item).
+- [ ] **Inter-Package Contracts:**
+    - [ ] Ensure clear contracts for how this package interacts with `Commerce` (e.g., for applying discounts to carts) (existing TODO item).
+
+This package requires significant implementation based on its README. The immediate step is to verify the existence of any other model/service files not shown by the initial `ls`.

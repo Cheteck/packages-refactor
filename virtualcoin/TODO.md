@@ -1,0 +1,52 @@
+# TODO for VirtualCoin Package
+
+- [X] **License and Author:**
+    - [X] Change license in `composer.json` from "MIT" to "proprietary".
+    - [X] Standardize author name in `composer.json` to "IJIDeals" and email to "contact@ijideals.com".
+- [X] **CRITICAL: Missing Migrations:**
+    - [X] Create migrations for `virtual_coins` (or `coin_wallets`) and `coin_transactions` tables. (Migrations created)
+        - `virtual_coins` table should include `user_id` (foreign key to users table), `balance` (decimal).
+        - `coin_transactions` table should include `user_id`, `amount` (decimal), `type` (string/enum), `reference` (string, unique), `description` (nullable text), `metadata` (JSON, nullable), `status` (string/enum).
+    - [X] Update `VirtualCoinServiceProvider` to load and publish these migrations. (Provider created/updated)
+- [X] **CRITICAL: Transaction Atomicity in `VirtualCoin::createTransaction()`:**
+    - [X] Wrap the balance update and transaction creation/status update within a `DB::transaction`. (Done in `VirtualCoin::createTransaction` method)
+- [X] **Dependencies:**
+    - [X] Add `ijideals/user-management` as a required dependency in `composer.json`.
+    - [X] Add `illuminate/database` as a required dependency.
+- [X] **Namespace Standardization:**
+    - [X] Change PSR-4 namespace in `composer.json` from `Ijideals\\Virtualcoin\\` to `IJIDeals\\VirtualCoin\\`.
+    - [X] Update all namespaces within the package (Models, Provider, Traits) from `Ijideals\Virtualcoin\...` to `IJIDeals\VirtualCoin\...`. (Done for new/updated files)
+- [ ] **Model Naming & README Consistency:**
+    - [X] The model is `VirtualCoin.php` but README refers to it as `CoinWallet`. Standardize to one name. `VirtualCoin` seems appropriate for the model representing the wallet/balance. Update README accordingly. (Model updated, `virtual_coins` table used)
+- [X] **Traits:**
+    - [X] Create the `HasVirtualWallet` trait intended for use on the `User` model (from `user-management` package). (Trait created)
+    - [ ] The current `HasCoinTransactions` trait is empty and applied to `CoinTransaction` itself. Clarify its purpose (is it for future shared transaction logic?) or remove if redundant.
+- [ ] **Services:**
+    - [ ] Decide if a `WalletService` (mentioned in README) is needed. If so, implement it to encapsulate wallet logic (deposit, withdraw, transfer, history), potentially making the `VirtualCoin` model and `HasVirtualWallet` trait call this service. If not creating a service, remove its mention from the README.
+- [ ] **Enums for Model Fields:**
+    - [ ] Consider creating PHP Enums for `CoinTransaction->type` (e.g., `TransactionTypeEnum:DEPOSIT, WITHDRAWAL, SPEND, REFUND, BONUS`) and `CoinTransaction->status` (e.g., `TransactionStatusEnum:PENDING, COMPLETED, FAILED, REFUNDED`). Update model casts and validation accordingly.
+- [ ] **API Endpoints & Routes:**
+    - [ ] The README mentions "API for Balance & History". If these are required:
+        - [ ] Create a `VirtualCoinController` or similar.
+        - [ ] Define routes (likely in `routes/api.php`, which needs to be created).
+        - [ ] Implement controller methods to show balance and transaction history for the authenticated user.
+        - [ ] Add OpenAPI documentation for these endpoints.
+    - [X] Ensure `VirtualCoinServiceProvider` loads routes if they are added. (Provider created/updated to handle this pattern)
+- [X] **Configuration:**
+    - [X] Evaluate if any aspects need configuration. (Config file `virtualcoin.php` created and published via SP)
+- [X] **Internal TODOs in `VirtualCoin.php`:**
+    - [X] Review and address/remove comments like `// TODO: Remove this model from app/Models...`, etc. (Model refactored)
+- [ ] **Error Handling:**
+    - [ ] The `withdraw()` and `spend()` methods throw a generic `\Exception('Insufficient balance')`. Consider creating a custom exception (e.g., `InsufficientBalanceException`) for better error handling by consumers of the package.
+- [ ] **Testing:**
+    - [ ] Write unit tests for `VirtualCoin` model methods (deposit, withdraw, balance checks, transaction creation).
+    - [ ] Write unit tests for `CoinTransaction` model accessors.
+    - [ ] Write feature tests for any API endpoints if added.
+    - [ ] Test for race conditions if multiple operations can occur on a wallet simultaneously (though DB transactions help).
+- [ ] **Documentation (README):**
+    - [ ] Update model names and trait names to be consistent with implementation.
+    - [ ] Document usage of the `HasVirtualWallet` trait on the User model.
+    - [ ] Document any API endpoints if created.
+    - [ ] Provide clear examples of how to use the package.
+
+This completes the analysis for `ijideals/virtualcoin`. I'll now move to `ijideals/analytics`.

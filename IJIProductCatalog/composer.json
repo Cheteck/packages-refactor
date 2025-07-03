@@ -1,0 +1,38 @@
+{
+    "name": "ijideals/ijiproductcatalog",
+    "description": "Laravel package for managing core product catalog data.",
+    "type": "laravel-package",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0|^8.1|^8.2|^8.3",
+        "illuminate/support": "^9.0|^10.0|^11.0",
+        "illuminate/database": "^9.0|^10.0|^11.0",
+        "spatie/laravel-permission": "^5.10|^6.0",
+        "spatie/laravel-medialibrary": "^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\IJIProductCatalog\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "IJIDeals\\IJIProductCatalog\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\IJIProductCatalog\\IJIProductCatalogServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

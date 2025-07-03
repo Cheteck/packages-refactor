@@ -1,0 +1,52 @@
+# TODO for Location Package
+
+- [X] **License and Author:**
+    - [X] Change license in `composer.json` from "MIT" to "proprietary". (Global instruction)
+    - [X] Author details ("IJIDeals", "contact@ijideals.com") updated in `composer.json`.
+- [ ] **CRITICAL: Resolve Translation Strategy Inconsistency:**
+    - `Region` model uses `spatie/laravel-translatable`.
+    - `City` model uses `astrotomic/laravel-translatable` (with `CityTranslation` model).
+    - `Country` model is not currently translatable but has a `CountryTranslation` model prepared for Astrotomic's pattern.
+    - **Action:** Standardize all translatable models in this package (`Country`, `Region`, `City`) to use `astrotomic/laravel-translatable` for consistency with the recommended approach for the `ijideals/internationalization` package.
+        - [X] Remove `spatie/laravel-translatable` from this package's `composer.json`. (Replaced with astrotomic)
+        - [ ] Add `Astrotomic\Translatable\Contracts\Translatable as TranslatableContract` and `Astrotomic\Translatable\Translatable` trait to `Country` and `Region` models.
+        - [ ] Define `$translatedAttributes` and `$translationModel` properties in `Country` (using `CountryTranslation`) and `Region` (will require creating `RegionTranslation` model and migration).
+        - [ ] Create `RegionTranslation` model and its corresponding migration.
+- [ ] **CRITICAL: Service Provider (`LocationServiceProvider.php`) & Migrations:**
+    - [ ] The `boot()` method in `LocationServiceProvider` is empty. It **must** be updated to:
+        - Load migrations: `loadMigrationsFrom(__DIR__.'/../../database/migrations');` (Update path if migrations are in `src/Database/Migrations`).
+        - Publish migrations: `publishes([__DIR__.'/../../database/migrations' => database_path('migrations')], 'migrations');` (Update path accordingly).
+    - [ ] **Action Required: Locate and list migration files.** Use `ls` for potential paths like `packages/ijideals/location/database/migrations/` or `packages/ijideals/location/src/Database/migrations/`.
+    - [ ] Once migration files are identified, review their structure for `countries`, `regions`, `cities`, `addresses`, and the translation tables (`country_translations`, `city_translations`, and the new `region_translations`). Ensure they are correct and follow best practices (foreign keys, indexes).
+- [X] **Dependencies & Versioning:**
+    - [X] `illuminate/support` and `illuminate/database` allow `^9.0|^10.0|^11.0`. Verified compatibility or narrow the range. (Standardized to ^10.0|^11.0)
+    - [X] `cviebrock/eloquent-sluggable: ^10.0`. Check for newer stable versions if appropriate. (Kept ^10.0)
+    - [X] PHP version `^8.1`. Standardize if other packages align differently. (Kept ^8.1)
+- [ ] **Models:**
+    - **`Address.php`:**
+        - [ ] Remove the unnecessary `scopeWhere()` method.
+        - [ ] Clarify the purpose of commented-out traits (`AddressFormatter`, `AddressSearchable`, `HasAddressValidation`). Implement or remove.
+    - **`Country.php`:**
+        - [ ] Make `Country` model translatable using `astrotomic/laravel-translatable` and the existing `CountryTranslation` model.
+    - **Internal TODOs in `Region.php`:**
+        - [ ] Review and address/remove comments like `// TODO: Move this model to packages/location/src/Models/Region.php` (it's already there), `// TODO: Create new package 'location' ...`, `// TODO: Use Location\Traits\HasRegions ...`.
+- [ ] **Traits:**
+    - [ ] **`HasCities.php` & `HasCountries.php`:**
+        - **Action Required: Read these trait files.**
+        - Analyze their purpose and usage. Clarify why `HasCities` might be used on the `City` model itself.
+- [ ] **Seeders:**
+    - [ ] The README mentions `IJIDeals\Location\Database\Seeders\LocationDatabaseSeeder`.
+        - **Action Required: Locate and list seeder files.** Use `ls` for potential paths like `packages/ijideals/location/database/seeders/` or `src/Database/Seeders/`.
+        - Review seeder content for comprehensiveness and efficiency.
+        - Ensure seeders are publishable by the Service Provider or instructions for running them are very clear.
+- [ ] **Documentation (README & Code):**
+    - [ ] Detail the "Validation Rules" (e.g., for addresses, country codes) and "Distance Calculation" helper features mentioned in README. Provide examples of how to use them.
+    - [ ] Update installation/usage instructions in README once Service Provider is fixed for migrations/seeders.
+    - [ ] Add/review PHP docblocks for all models, traits, and public methods.
+    - [ ] Add OpenAPI annotations if any part of this package becomes API-accessible.
+- [ ] **Configuration:**
+    - [ ] This package currently has no specific configuration file. Evaluate if any aspects (e.g., default distance units, specific validation patterns for postal codes by country) would benefit from being configurable.
+- [ ] **Testing (`pestphp/pest`):**
+    - [ ] Ensure tests cover model relationships, trait functionalities, and any helper methods (especially distance calculation, validation rules).
+    - [ ] Test seeder execution if possible.
+    - [ ] Add tests for translatable attributes once standardized.

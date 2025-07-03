@@ -1,0 +1,35 @@
+{
+    "name": "ijideals/sponsorship",
+    "description": "Sponsorship package for IJIDeals platform, potentially for creator tiers or post boosting.",
+    "type": "library",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "IJIDeals\\Sponsorship\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "IJIDeals",
+            "email": "contact@ijideals.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0",
+        "ijideals/user-management": "*",
+        "ijideals/social": "*",
+        "ijideals/virtualcoin": "*",
+        "ijideals/pricing": "*",
+        "ijideals/ijicommerce": "*"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IJIDeals\\Sponsorship\\Providers\\SponsorshipServiceProvider"
+            ]
+        }
+    }
+}

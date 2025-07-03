@@ -1,0 +1,58 @@
+# TODO for Inventory Package
+
+- [ ] **License and Author:**
+    - [X] License "proprietary" is correct.
+    - [X] Author "IJIDeals", "contact@ijideals.com" is correct.
+- [ ] **PHP Version:**
+    - [ ] Review PHP version requirement (`^8.1`) for standardization.
+- [ ] **CRITICAL: Implement Core Package Components (Models, Services, Events):**
+    - Based on the README, the following core components need to be created/verified:
+    - **Models:**
+        - [X] `Inventory` (or `Stock`): To store quantity on hand for a stockable item (product/variant) at a specific location. Fields: `stockable_id`, `stockable_type`, `location_id`, `quantity`, `reserved_quantity`. (Model created)
+        - [X] `StockMovement`: To log all changes in inventory. Fields: `stockable_id`, `stockable_type`, `location_id`, `quantity_change` (can be negative), `type` (e.g., 'sale', 'return', 'restock', 'adjustment', 'damage'), `reference_id` (e.g., order_id), `reference_type`, `user_id` (optional, who initiated). (Model created)
+        - [X] `Location` (or `InventoryLocation`): To represent warehouses or stock-holding locations. Fields: `name`, `address_details` (or link to Address model from `ijideals/location`). (Model InventoryLocation created)
+    - **Services:**
+        - [X] `InventoryService`: Central service for all operations:
+            - Adjusting stock (increase/decrease).
+            - Reserving stock (e.g., on cart add).
+            - Releasing reservations (e.g., on cart expiry or order completion/cancellation).
+            - Checking stock availability.
+            - Handling stock movements logging.
+            - Ensuring atomic operations for stock updates (using DB transactions). (Service created with basic methods)
+    - **Events:**
+        - [ ] `LowStockAlert` (when quantity falls below a threshold).
+        - [ ] `StockReduced` (e.g., after a sale).
+        - [ ] `StockRestocked` (e.g., after new inventory arrival).
+    - **Action Required:** Use `ls` to check `packages/ijideals/inventory/src/Models/`, `src/Services/`, `src/Events/` for existing files. If they exist, analyze them. If not, they need to be created. (Done for Models and Services)
+- [X] **CRITICAL: Create Migrations & Factories:**
+    - [X] Create migrations for `inventories` (or `stock`), `stock_movements`, `inventory_locations` tables. (Migrations created)
+    - [X] Ensure `InventoryServiceProvider` correctly loads and publishes these migrations from `src/Database/migrations/`. (Provider updated)
+    - [X] Create model factories for testing. (Factories created)
+    - **Action Required:** Use `ls packages/ijideals/inventory/src/Database/migrations/` and `ls packages/ijideals/inventory/src/Database/factories/` to check for existing files. (Done)
+- [X] **Dependencies:**
+    - [X] Add `ijideals/commerce` to `composer.json` `require` section, as per README dependency for order processing. (Was `ijideals/catalog`, corrected to `ijideals/commerce` as per README and typical use).
+- [ ] **Configuration (`inventory.php`):**
+    - [ ] Populate `config/inventory.php` with relevant settings:
+        - Default low stock threshold value.
+        - Inventory reservation duration.
+        - Default inventory location if single-location is a common use-case.
+        - Configuration for event dispatching (e.g., enable/disable specific alerts).
+- [ ] **README Accuracy:**
+    - [ ] **Correct the second "Models" list:** Remove the list "Stock, Variant, VariantTranslation..." as it seems copied from the `catalog` package. Replace it with the actual intended models for this package: `Inventory`, `StockMovement`, `Location`.
+    - [ ] Ensure all features described in "Core Features" are implementable with the defined components.
+- [ ] **Implement Core Features (in Service/Models):**
+    - [ ] Real-time Stock Tracking.
+    - [ ] Multi-location Inventory management.
+    - [ ] Stock Movements logging.
+    - [ ] Low Stock Alerts (event-driven).
+    - [ ] Inventory Reservation mechanism.
+    - [ ] Atomic Operations for all stock changes.
+- [ ] **Testing:**
+    - [ ] Write unit tests for `InventoryService` methods (stock adjustments, reservations, availability checks).
+    - [ ] Test model relationships and scopes.
+    - [ ] Test event dispatching for low stock, stock changes.
+    - [ ] Test for race conditions in stock updates if applicable (though DB transactions should mitigate most).
+- [ ] **API Endpoints (Optional):**
+    - [ ] Determine if any inventory data needs to be exposed via an API (e.g., checking stock levels, viewing locations). If so, create routes, controllers, and document them.
+
+This package requires substantial implementation if the README is the guide. The immediate step is to verify the existence of the core PHP files.

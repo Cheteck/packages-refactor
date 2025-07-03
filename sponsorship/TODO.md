@@ -1,0 +1,62 @@
+# TODO for Sponsorship Package
+
+- [X] **License and Author:**
+    - [X] License "proprietary" is correct.
+    - [X] Update author email in `composer.json` from `dev@ijideals.com` to `contact@ijideals.com`.
+- [X] **PHP Version:**
+    - [X] Review PHP version requirement (`^8.1`) for standardization. (Kept ^8.1, illuminate/support standardized)
+- [X] **CRITICAL: Define Package Purpose & Reconcile README with Implementation:**
+    - The README describes a "creator sponsorship program" with Tiers, Benefits, and recurring Subscriptions (like Patreon).
+    - The only existing model (`SponsoredPost.php`) implements a "boost a social post" feature using virtual coins (pay-per-click/impression).
+    - **Decision Required:** Option B - Post Boosting.
+        - **Option A (README is correct - Tier-based Creator Sponsorship):**
+            - [ ] The `SponsoredPost` model is likely misplaced; consider moving it to `ijideals/ads-manager` or a new dedicated `PostBoosting` package.
+            - [ ] This `sponsorship` package then needs full implementation of the tier-based system:
+                - **Models:** `Sponsorable` (Interface/Trait for User/Shop), `Sponsorship` (User's subscription to a Sponsorable), `Tier` (levels defined by Sponsorable), `Benefit` (perks per Tier).
+                - **Services:** `SubscriptionService`, `TierService`, `BenefitService`.
+                - **Logic:** Handling recurring payments (via payment gateway or `ijideals/commerce`), granting benefits (exclusive content access, roles via `user-management`, discounts via `pricing`).
+        - [X] **Option B (`SponsoredPost` model is correct - Post Boosting):**
+            - [ ] The README needs a complete rewrite to describe the post/content sponsorship/boosting feature. The package name "sponsorship" could still fit this.
+            - [X] The "Features" section in README needs to align with `SponsoredPost` functionality. (Model is primary focus for now)
+- [X] **CRITICAL: Implement Missing Migrations & Service Provider Update:**
+    - [X] **Action Required: Locate/Create migration files.** (Migration `create_sponsored_posts_table` created)
+    - If Option A (Tier-based): Need migrations for `sponsorships`, `tiers`, `benefits`, `sponsorables` (if a dedicated table for entities that can be sponsored), pivot tables (e.g., `sponsorship_tier_benefit`, `user_sponsorships`).
+    - [X] If Option B (`SponsoredPost`): Need migration for `sponsored_posts` table (schema should match `SponsoredPost` model fields).
+    - [X] Ensure `SponsorshipServiceProvider` correctly loads and publishes these migrations. (Provider updated)
+    - [X] Create model factories for testing. (Factory created)
+- [X] **Dependencies in `composer.json`:**
+    - [X] `ijideals/user-management` is listed.
+    - Update based on chosen purpose: (Added all likely, to be refined based on final purpose)
+        - If Option A (Tier-based):
+            - [X] `ijideals/virtualcoin` (if used for payments).
+            - [X] `ijideals/pricing` (if discount benefits are offered).
+            - [X] Payment gateway SDKs or `ijideals/commerce` (if it handles subscriptions).
+        - [X] If Option B (`SponsoredPost`):
+            - [X] `ijideals/social` (for `Post` model) - **MUST ADD**.
+            - [X] `ijideals/virtualcoin` (currently a hard dependency in `SponsoredPost` model) - **MUST ADD**.
+- [X] **Configuration:**
+    - [X] Create `config/sponsorship.php`. (Created)
+    - [X] Update `SponsorshipServiceProvider` to load and publish it. (Provider updated)
+    - If Option A: Settings for default tiers, benefit types, payment provider keys, subscription cycle defaults, dunning process.
+    - [X] If Option B: Default CPC/CPI, budget limits, status names for sponsored posts, targeting options if configurable. (Initial config created)
+- [X] **`SponsoredPost.php` Model (If kept and Option B is chosen):**
+    - [X] Wrap `recordImpression()` and `recordClick()` coin transaction logic in `DB::transaction()` for atomicity.
+    - [ ] Relationship `transactions()`: Linking via `metadata->sponsored_post_id` on `CoinTransaction` is fragile. Consider:
+        - Adding a direct `sponsored_post_id` (nullable FK) to `coin_transactions` table.
+        - Or, making `CoinTransaction` use a polymorphic `transactionable` relationship, where `SponsoredPost` can be a `transactionable` type.
+- [X] **Implement Missing Components (based on chosen purpose):**
+    - If Option A: Implement all models (`Sponsorable`, `Sponsorship`, `Tier`, `Benefit`), services, event listeners for subscription lifecycle, benefit fulfillment logic.
+    - [X] If Option B: Flesh out `SponsoredPost` model, potentially create a `SponsoredPostService` to manage campaigns, targeting, and budget. (Model updated, Service created)
+- [ ] **API Endpoints & Routes:**
+    - Define and implement API routes, controllers, Form Requests, and Policies based on the chosen functionality (e.g., API for creators to manage tiers, for users to subscribe; or API for users to sponsor posts, view campaign performance).
+- [ ] **README Update:**
+    - [ ] **Crucial:** Rewrite or significantly update to match the chosen direction (Tier-based or Post Boosting).
+    - [ ] Document all models, services, API endpoints, and configuration.
+- [ ] **Testing:**
+    - [ ] Write comprehensive tests covering the chosen feature set:
+        - Tier/subscription management OR sponsored post lifecycle.
+        - Payment processing (mocked).
+        - Benefit fulfillment OR impression/click tracking and budget deduction.
+        - API endpoints and policies.
+
+This package requires a fundamental decision about its core functionality before detailed implementation. The current state is a mismatch between README and code.
