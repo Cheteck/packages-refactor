@@ -38,7 +38,7 @@ class UpdateShopOrderStatusRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
-    public function rules()
+    public function rules(): array
     {
         // These statuses should ideally come from a config or an Enum
         $allowedStatuses = config('ijiordermanagement.shop_updatable_statuses', [
@@ -53,6 +53,31 @@ class UpdateShopOrderStatusRequest extends FormRequest
             'status' => ['required', 'string', Rule::in($allowedStatuses)],
             'tracking_number' => 'nullable|string|max:255|required_if:status,shipped', // Tracking number required if status is 'shipped'
             'notes_for_customer' => 'nullable|string|max:1000',
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'status' => [
+                'description' => 'The new status of the order.',
+                'type' => 'string',
+                'required' => true,
+                'enum' => ['processing', 'shipped', 'completed', 'on_hold', 'cancelled_by_shop'],
+            ],
+            'tracking_number' => [
+                'description' => 'The tracking number for the order. Required if status is "shipped".',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'notes_for_customer' => [
+                'description' => 'Optional notes for the customer regarding the order status update.',
+                'type' => 'string',
+                'required' => false,
+            ],
         ];
     }
 

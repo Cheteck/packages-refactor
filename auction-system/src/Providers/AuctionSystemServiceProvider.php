@@ -6,9 +6,25 @@ use IJIDeals\AuctionSystem\Jobs\DetermineAuctionWinnerJob;
 use IJIDeals\AuctionSystem\Services\AuctionService; // Assuming service will be created
 use Illuminate\Console\Scheduling\Schedule; // Assuming job will be created
 use Illuminate\Support\ServiceProvider;
+use IJIDeals\AuctionSystem\Events\NewBidPlaced;
+use IJIDeals\AuctionSystem\Listeners\SendOverbidNotification;
 
 class AuctionSystemServiceProvider extends ServiceProvider
 {
+    /**
+     * The event listener mappings for the application.
+     *
+     * @var array
+     */
+    protected $listen = [
+        NewBidPlaced::class => [
+            SendOverbidNotification::class,
+        ],
+        \IJIDeals\AuctionSystem\Events\AuctionEnded::class => [
+            \IJIDeals\AuctionSystem\Listeners\SendAuctionEndedNotification::class,
+        ],
+    ];
+
     public function register()
     {
         $this->mergeConfigFrom(

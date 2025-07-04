@@ -15,7 +15,7 @@ return new class extends Migration
     {
         $tableName = config('ijiproductcatalog.tables.categories', 'categories');
 
-        Schema::create($tableName, function (Blueprint $table) {
+        Schema::create($tableName, function (Blueprint $table) use ($tableName) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();

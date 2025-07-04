@@ -94,4 +94,44 @@ class UserController extends Controller
         return redirect()->route('user-management.users.show', $user->id)
                          ->with('success', 'User updated successfully.');
     }
-}
+
+    /**
+     * Display the authenticated user's profile.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function showAuthenticatedUser(Request $request)
+    {
+        return response()->json($request->user());
+    }
+
+    /**
+     * Update the authenticated user's profile in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateAuthenticatedUser(Request $request)
+    {
+        $user = $request->user();
+
+        $validatedData = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
+            'username' => 'sometimes|string|max:255|unique:users,username,' . $user->id . '|nullable',
+            'profile_photo_path' => 'nullable|string|max:2048',
+            'cover_photo_path' => 'nullable|string|max:2048',
+            'bio' => 'nullable|string',
+            'birthdate' => 'nullable|date',
+            'gender' => 'nullable|string|max:50',
+            'phone' => 'nullable|string|max:25',
+            'preferred_language' => 'nullable|string|max:10',
+            'location' => 'nullable|string|max:255',
+            'website' => 'nullable|url|max:255',
+        ]);
+
+        $user->update($validatedData);
+
+        return response()->json(['message' => 'Profile updated successfully', 'user' => $user]);
+    }

@@ -32,8 +32,6 @@ return new class extends Migration
 
             $table->string('status')->default('draft_by_admin');
 
-            $table->foreignId('created_by_proposal_id')->nullable()->constrained($productProposalsTable)->onDelete('set null');
-
             $table->timestamps();
         });
     }

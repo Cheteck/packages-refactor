@@ -314,4 +314,33 @@ class Address extends Model
             })
         );
     }
+
+    /**
+     * Calculate the distance between two addresses using the Haversine formula.
+     *
+     * @param Address $address1
+     * @param Address $address2
+     * @return float Distance in kilometers
+     */
+    public static function calculateDistance(Address $address1, Address $address2): float
+    {
+        if (is_null($address1->latitude) || is_null($address1->longitude) ||
+            is_null($address2->latitude) || is_null($address2->longitude)) {
+            return 0.0; // Or throw an exception if lat/lng are required
+        }
+
+        $earthRadius = 6371; // kilometers
+
+        $latFrom = deg2rad($address1->latitude);
+        $lonFrom = deg2rad($address1->longitude);
+        $latTo = deg2rad($address2->latitude);
+        $lonTo = deg2rad($address2->longitude);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) + 
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+        return $angle * $earthRadius;
+    }
 }

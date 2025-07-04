@@ -1,5 +1,5 @@
 {
-    "name": "acme/laravel-secure-messaging",
+    "name": "ijideals/laravel-secure-messaging",
     "description": "A Laravel package for secure end-to-end encrypted messaging.",
     "type": "laravel-package",
     "license": "MIT",

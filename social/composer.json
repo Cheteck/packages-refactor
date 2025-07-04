@@ -17,7 +17,7 @@
         "ijideals/file-management": "*",
         "ijideals/analytics": "*",
         "ijideals/ijicommerce": "*",
-        "ijideals/messaging": "*"
+        "ijideals/laravel-secure-messaging": "*"
     },
     "autoload": {
         "psr-4": {

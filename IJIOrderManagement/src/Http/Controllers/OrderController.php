@@ -151,6 +151,13 @@ class OrderController extends Controller
             Log::info('OrderController@store: Order created successfully, transaction committed.', ['user_id' => $userId, 'order_id' => $order->id, 'order_number' => $order->order_number]);
 
             // TODO: Dispatch OrderPlaced event
+            \IJIDeals\Analytics\Facades\Analytics::track('order_placed', [
+                'order_id' => $order->id,
+                'total_amount' => $order->total_amount,
+                'user_id' => $order->user_id,
+                'shop_id' => $order->shop_id,
+                'item_count' => count($orderItemsData),
+            ], $order->user_id);
             // TODO: Trigger payment processing
 
             return response()->json($order->fresh()->load('items'), 201);

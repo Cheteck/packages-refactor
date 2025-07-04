@@ -12,10 +12,11 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Image\Manipulations;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Support\Facades\Log;
+use IJIDeals\Analytics\Traits\TrackableStats; // Added
 
 class MasterProduct extends Model implements HasMedia
 {
-    use InteractsWithMedia, HasFactory;
+    use InteractsWithMedia, HasFactory, TrackableStats; // Added TrackableStats
 
     protected $fillable = [
         'name',

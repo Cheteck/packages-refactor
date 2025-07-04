@@ -30,4 +30,18 @@ class RejectProductProposalRequest extends FormRequest
             'admin_notes' => 'required|string|max:5000',
         ];
     }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'admin_notes' => [
+                'description' => 'Notes from the admin explaining the rejection.',
+                'type' => 'string',
+                'required' => true,
+            ],
+        ];
+    }
 }

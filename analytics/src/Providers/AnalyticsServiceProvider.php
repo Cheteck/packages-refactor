@@ -8,6 +8,10 @@ class AnalyticsServiceProvider extends ServiceProvider
 {
     public function register()
     {
+        $this->app->singleton('analytics', function ($app) {
+            return new \IJIDeals\Analytics\Services\AnalyticsService();
+        });
+
         $this->mergeConfigFrom(
             __DIR__.'/../../config/analytics.php', 'analytics'
         );

@@ -42,4 +42,38 @@ class UpdateCategoryRequest extends FormRequest
             'image' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048',
         ];
     }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'name' => [
+                'description' => 'The name of the category.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'slug' => [
+                'description' => 'A unique slug for the category.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'description' => [
+                'description' => 'A brief description of the category.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'parent_id' => [
+                'description' => 'The ID of the parent category, if this is a subcategory.',
+                'type' => 'integer',
+                'required' => false,
+            ],
+            'image' => [
+                'description' => 'The image file for the category.',
+                'type' => 'file',
+                'required' => false,
+            ],
+        ];
+    }
 }

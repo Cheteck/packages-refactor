@@ -39,4 +39,49 @@ class ApproveProductProposalRequest extends FormRequest
             'admin_notes' => 'nullable|string|max:5000', // Notes for the proposal itself
         ];
     }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'name' => [
+                'description' => 'The name for the new Master Product.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'description' => [
+                'description' => 'The description for the new Master Product.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'brand_id' => [
+                'description' => 'The ID of the brand for the new Master Product.',
+                'type' => 'integer',
+                'required' => false,
+            ],
+            'category_id' => [
+                'description' => 'The ID of the category for the new Master Product.',
+                'type' => 'integer',
+                'required' => false,
+            ],
+            'specifications' => [
+                'description' => 'JSON array of specifications for the new Master Product.',
+                'type' => 'array',
+                'required' => false,
+            ],
+            'status' => [
+                'description' => 'The status of the new Master Product.',
+                'type' => 'string',
+                'required' => true,
+                'enum' => ['active', 'draft_by_admin', 'archived'],
+            ],
+            'admin_notes' => [
+                'description' => 'Admin notes regarding the approval of the product proposal.',
+                'type' => 'string',
+                'required' => false,
+            ],
+        ];
+    }
 }

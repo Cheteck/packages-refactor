@@ -3,6 +3,9 @@
 namespace IJIDeals\UserManagement;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+use IJIDeals\UserManagement\Models\User;
+use IJIDeals\Analytics\Facades\Analytics;
 
 class UserManagementServiceProvider extends ServiceProvider
 {
@@ -45,6 +48,15 @@ class UserManagementServiceProvider extends ServiceProvider
         $this->publishes([
             // Example: __DIR__.'/../public' => public_path('vendor/user-management'),
         ], ['user-management-assets', 'laravel-assets']);
+
+        // Listen for User created event to track analytics
+        User::created(function (User $user) {
+            Analytics::track('user_registered', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+            ], $user->id);
+        });
     }
 
     /**

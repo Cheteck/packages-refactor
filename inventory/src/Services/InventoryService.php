@@ -9,6 +9,7 @@ use IJIDeals\Inventory\Models\StockMovement;
 use IJIDeals\UserManagement\Models\User;
 use Illuminate\Database\Eloquent\Model; // Assuming User model path
 use Illuminate\Support\Facades\DB;
+use IJIDeals\Analytics\Facades\Analytics;
 
 class InventoryService
 {
@@ -76,6 +77,15 @@ class InventoryService
                 'description' => $description,
             ]);
 
+            Analytics::track('stock_updated', [
+                'stockable_id' => $stockable->getKey(),
+                'stockable_type' => $stockable->getMorphClass(),
+                'location_id' => $location->getKey(),
+                'quantity_change' => $quantityChange,
+                'new_quantity' => $inventory->quantity,
+                'movement_type' => $type,
+            ], $user ? $user->getKey() : (auth()->check() ? auth()->id() : null));
+
             if ($inventory->available_quantity <= 10) {
                 event(new \IJIDeals\Inventory\Events\LowStockAlert($inventory));
             }
@@ -112,7 +122,14 @@ class InventoryService
             $inventory->reserved_quantity += $quantityToReserve;
             $inventory->save();
 
-            // Optionally, log this as a specific type of stock movement or a separate reservation log
+            Analytics::track('stock_reserved', [
+                'stockable_id' => $stockable->getKey(),
+                'stockable_type' => $stockable->getMorphClass(),
+                'location_id' => $location->getKey(),
+                'quantity_reserved' => $quantityToReserve,
+                'new_reserved_quantity' => $inventory->reserved_quantity,
+                'available_quantity' => $inventory->available_quantity,
+            ], $user ? $user->getKey() : (auth()->check() ? auth()->id() : null));
 
             return $inventory;
         });
@@ -145,6 +162,15 @@ class InventoryService
 
             $inventory->reserved_quantity -= $quantityToRelease;
             $inventory->save();
+
+            Analytics::track('stock_released', [
+                'stockable_id' => $stockable->getKey(),
+                'stockable_type' => $stockable->getMorphClass(),
+                'location_id' => $location->getKey(),
+                'quantity_released' => $quantityToRelease,
+                'new_reserved_quantity' => $inventory->reserved_quantity,
+                'available_quantity' => $inventory->available_quantity,
+            ], $user ? $user->getKey() : (auth()->check() ? auth()->id() : null));
 
             return $inventory;
         });

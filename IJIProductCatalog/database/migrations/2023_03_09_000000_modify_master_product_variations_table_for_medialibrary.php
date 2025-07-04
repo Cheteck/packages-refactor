@@ -15,7 +15,7 @@ return new class extends Migration
     {
         $tableName = config('ijiproductcatalog.tables.master_product_variations', 'master_product_variations');
 
-        Schema::table($tableName, function (Blueprint $table) {
+        Schema::table($tableName, function (Blueprint $table) use ($tableName) {
             if (Schema::hasColumn($tableName, 'images_payload_variation')) {
                 $table->dropColumn('images_payload_variation');
             }
@@ -31,7 +31,7 @@ return new class extends Migration
     {
         $tableName = config('ijiproductcatalog.tables.master_product_variations', 'master_product_variations');
 
-        Schema::table($tableName, function (Blueprint $table) {
+        Schema::table($tableName, function (Blueprint $table) use ($tableName) {
             if (!Schema::hasColumn($tableName, 'images_payload_variation')) {
                 $table->json('images_payload_variation')->nullable()->after('stock_override');
             }

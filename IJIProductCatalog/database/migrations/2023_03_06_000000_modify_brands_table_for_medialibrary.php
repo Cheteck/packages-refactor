@@ -15,7 +15,7 @@ return new class extends Migration
     {
         $tableName = config('ijiproductcatalog.tables.brands', 'brands');
 
-        Schema::table($tableName, function (Blueprint $table) {
+        Schema::table($tableName, function (Blueprint $table) use ($tableName) {
             if (Schema::hasColumn($tableName, 'logo_path')) {
                 $table->dropColumn('logo_path');
             }
@@ -34,7 +34,7 @@ return new class extends Migration
     {
         $tableName = config('ijiproductcatalog.tables.brands', 'brands');
 
-        Schema::table($tableName, function (Blueprint $table) {
+        Schema::table($tableName, function (Blueprint $table) use ($tableName) {
             if (!Schema::hasColumn($tableName, 'logo_path')) {
                 $table->string('logo_path')->nullable()->after('description');
             }

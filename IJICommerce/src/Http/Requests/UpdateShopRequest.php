@@ -29,7 +29,7 @@ class UpdateShopRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
-    public function rules()
+    public function rules(): array
     {
         $shopId = $this->route('shop') ? $this->route('shop')->id : null;
 
@@ -55,6 +55,94 @@ class UpdateShopRequest extends FormRequest
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string|max:500',
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'name' => [
+                'description' => 'The name of the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'slug' => [
+                'description' => 'A unique slug for the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'description' => [
+                'description' => 'A brief description of the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'contact_email' => [
+                'description' => 'The contact email for the shop.',
+                'type' => 'string',
+                'format' => 'email',
+                'required' => false,
+            ],
+            'contact_phone' => [
+                'description' => 'The contact phone number for the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'website_url' => [
+                'description' => 'The website URL for the shop.',
+                'type' => 'string',
+                'format' => 'url',
+                'required' => false,
+            ],
+            'status' => [
+                'description' => 'The status of the shop.',
+                'type' => 'string',
+                'required' => false,
+                'enum' => ['active', 'inactive', 'pending_approval', 'suspended'],
+            ],
+            'display_address' => [
+                'description' => 'The physical address to display for the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'logo_path' => [
+                'description' => 'The path to the shop\'s logo image.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'cover_photo_path' => [
+                'description' => 'The path to the shop\'s cover photo image.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'settings' => [
+                'description' => 'An array of key-value settings for the shop.',
+                'type' => 'object',
+                'required' => false,
+            ],
+            'approved_at' => [
+                'description' => 'The timestamp when the shop was approved.',
+                'type' => 'string',
+                'format' => 'date-time',
+                'required' => false,
+            ],
+            'meta_title' => [
+                'description' => 'SEO meta title for the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'meta_description' => [
+                'description' => 'SEO meta description for the shop.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'meta_keywords' => [
+                'description' => 'SEO meta keywords for the shop (comma-separated).',
+                'type' => 'string',
+                'required' => false,
+            ],
         ];
     }
 }

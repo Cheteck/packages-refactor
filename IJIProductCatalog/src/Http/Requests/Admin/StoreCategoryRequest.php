@@ -26,7 +26,7 @@ class StoreCategoryRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
-    public function rules()
+    public function rules(): array
     {
         $tableName = (new Category())->getTable();
         return [
@@ -35,6 +35,40 @@ class StoreCategoryRequest extends FormRequest
             'description' => 'nullable|string',
             'parent_id' => ['nullable', 'integer', Rule::exists($tableName, 'id')],
             'image' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048',
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'name' => [
+                'description' => 'The name of the category.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'slug' => [
+                'description' => 'A unique slug for the category. If not provided, one will be generated from the name.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'description' => [
+                'description' => 'A brief description of the category.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'parent_id' => [
+                'description' => 'The ID of the parent category, if this is a subcategory.',
+                'type' => 'integer',
+                'required' => false,
+            ],
+            'image' => [
+                'description' => 'The image file for the category.',
+                'type' => 'file',
+                'required' => false,
+            ],
         ];
     }
 }

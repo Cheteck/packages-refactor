@@ -10,9 +10,17 @@ use IJIDeals\Pricing\Models\ExchangeRate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use IJIDeals\UserManagement\Models\User;
+use IJIDeals\Pricing\Services\ShippingCostService; // Added
 
 class PricingService
 {
+    protected $shippingCostService; // Added
+
+    public function __construct(ShippingCostService $shippingCostService) // Added
+    {
+        $this->shippingCostService = $shippingCostService; // Added
+    }
+
     /**
      * Get the applicable price for a given priceable item, quantity, user, and currency.
      *
@@ -107,7 +115,10 @@ class PricingService
         $taxDetails = $this->calculateTaxes($totalAfterDiscounts, $currencyCode, $user);
         $totalTaxAmount = array_sum(array_column($taxDetails, 'amount'));
 
-        $finalTotal = $totalAfterDiscounts + $totalTaxAmount;
+        // Calculate shipping cost
+        $shippingCost = $this->shippingCostService->calculateShippingCost($items, $user, $currencyCode); // Added
+
+        $finalTotal = $totalAfterDiscounts + $totalTaxAmount + $shippingCost; // Modified
 
         return [
             'subtotal' => round($subtotal, 2),
@@ -115,6 +126,7 @@ class PricingService
             'applied_discounts' => $applicableDiscounts->pluck('name', 'code')->all(),
             'taxes' => $taxDetails,
             'total_tax_amount' => round($totalTaxAmount, 2),
+            'shipping_cost' => round($shippingCost, 2), // Added
             'total' => round($finalTotal, 2),
             'currency_code' => $currencyCode,
             'line_items' => $lineItemsDetails,

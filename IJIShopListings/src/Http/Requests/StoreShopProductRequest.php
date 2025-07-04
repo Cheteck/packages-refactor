@@ -40,7 +40,7 @@ class StoreShopProductRequest extends FormRequest
                 Rule::exists((new MasterProduct())->getTable(), 'id')->where('status', 'active'),
                 Rule::unique((new ShopProduct())->getTable())->where(function ($query) use ($shopId) {
                     return $query->where('shop_id', $shopId);
-                })->setMessage('This product is already listed in your shop.')
+                })
             ],
             // Price and stock are required if no variations are provided or if the master product itself has no variations.
             // This logic is a bit complex for basic rules and might need after-validation or controller logic.
@@ -94,6 +94,7 @@ class StoreShopProductRequest extends FormRequest
             'variations.*.price.required_with' => 'The price for each variation is required when variations are provided.',
             'variations.*.stock_quantity.required_with' => 'The stock quantity for each variation is required when variations are provided.',
             'variations.*.master_product_variation_id.required_with' => 'The master variation ID for each variation is required.',
+            'master_product_id.unique' => 'This product is already listed in your shop.',
         ];
     }
 }

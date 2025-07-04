@@ -26,7 +26,7 @@ class StoreOrderRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
-    public function rules()
+    public function rules(): array
     {
         return [
             'shop_id' => ['required', Rule::exists(config('ijicommerce.tables.shops', 'shops'), 'id')],
@@ -59,6 +59,150 @@ class StoreOrderRequest extends FormRequest
 
             // This is a placeholder; actual payment integration would be more complex.
             'payment_method_token' => 'required|string|max:255',
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'shop_id' => [
+                'description' => 'The ID of the shop the order is placed with.',
+                'type' => 'integer',
+                'required' => true,
+            ],
+            'items' => [
+                'description' => 'An array of items in the order.',
+                'type' => 'array',
+                'required' => true,
+                'example' => [
+                    ['type' => 'shopproduct', 'id' => 1, 'quantity' => 2],
+                    ['type' => 'shopproductvariation', 'id' => 5, 'quantity' => 1],
+                ],
+            ],
+            'items.*.type' => [
+                'description' => 'The type of the item (shopproduct or shopproductvariation).',
+                'type' => 'string',
+                'required' => true,
+                'enum' => ['shopproduct', 'shopproductvariation'],
+            ],
+            'items.*.id' => [
+                'description' => 'The ID of the shop product or shop product variation.',
+                'type' => 'integer',
+                'required' => true,
+            ],
+            'items.*.quantity' => [
+                'description' => 'The quantity of the item.',
+                'type' => 'integer',
+                'required' => true,
+            ],
+            'billing_address' => [
+                'description' => 'The billing address details.',
+                'type' => 'object',
+                'required' => true,
+            ],
+            'billing_address.first_name' => [
+                'description' => 'First name for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.last_name' => [
+                'description' => 'Last name for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.address_line_1' => [
+                'description' => 'Address line 1 for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.address_line_2' => [
+                'description' => 'Address line 2 for billing address.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'billing_address.city' => [
+                'description' => 'City for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.state' => [
+                'description' => 'State/Province for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.postal_code' => [
+                'description' => 'Postal code for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.country_code' => [
+                'description' => 'ISO 3166-1 alpha-2 country code for billing address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'billing_address.phone' => [
+                'description' => 'Phone number for billing address.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'shipping_address' => [
+                'description' => 'The shipping address details.',
+                'type' => 'object',
+                'required' => true,
+            ],
+            'shipping_address.first_name' => [
+                'description' => 'First name for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.last_name' => [
+                'description' => 'Last name for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.address_line_1' => [
+                'description' => 'Address line 1 for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.address_line_2' => [
+                'description' => 'Address line 2 for shipping address.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'shipping_address.city' => [
+                'description' => 'City for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.state' => [
+                'description' => 'State/Province for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.postal_code' => [
+                'description' => 'Postal code for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.country_code' => [
+                'description' => 'ISO 3166-1 alpha-2 country code for shipping address.',
+                'type' => 'string',
+                'required' => true,
+            ],
+            'shipping_address.phone' => [
+                'description' => 'Phone number for shipping address.',
+                'type' => 'string',
+                'required' => false,
+            ],
+            'payment_method_token' => [
+                'description' => 'A token representing the payment method.',
+                'type' => 'string',
+                'required' => true,
+            ],
         ];
     }
 
