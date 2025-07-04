@@ -92,38 +92,73 @@ class VirtualCoin extends Model
      */
     public function createTransaction(
         float $amount,
-        string $type,
+        string $type, // Should ideally be TransactionType enum instance or its ->value
         array $metadata = [],
         ?string $description = null,
         ?string $reference = null,
-        string $status = 'completed' // Default to completed, can be 'pending'
+        string $status = 'completed' // Default to completed, can be 'pending' - consider using config('virtualcoin.default_transaction_status')
     ): CoinTransaction {
-        return DB::transaction(function () use ($amount, $type, $metadata, $description, $reference, $status) {
-            $balanceBefore = $this->balance;
-            $newBalance = $balanceBefore + $amount;
+        // Validate transaction type using the Enum
+        if (!\IJIDeals\VirtualCoin\Enums\TransactionType::isValid($type)) {
+            throw new \InvalidArgumentException("Invalid transaction type: {$type}");
+        }
 
-            if ($newBalance < 0) {
-                throw new Exception('Insufficient balance for this transaction.');
+        // Use default status from config if not overridden
+        $finalStatus = $status ?: config('virtualcoin.default_transaction_status', 'completed');
+
+        return DB::transaction(function () use ($amount, $type, $metadata, $description, $reference, $finalStatus) {
+            // Idempotency Check
+            if ($reference && config('virtualcoin.idempotency_enabled', false)) {
+                $existingTransaction = $this->transactions()
+                    ->where('reference', $reference)
+                    ->where('created_at', '>=', now()->subMinutes(config('virtualcoin.idempotency_window_minutes', 1440)))
+                    ->first();
+
+                if ($existingTransaction) {
+                    // If a similar transaction (same reference, type, amount) exists and is completed, return it.
+                    // If it's pending or different, it might be an error or a retry of a failed one.
+                    // For simplicity, we'll prevent new transaction if reference is found in window.
+                    // More complex logic can be added here (e.g., check status, amount, type).
+                    // For now, any transaction with the same reference in the window is considered a duplicate.
+                    throw new \IJIDeals\VirtualCoin\Exceptions\DuplicateTransactionException("Duplicate transaction reference: {$reference}");
+                }
             }
 
-            // Create the transaction record
-            $transaction = $this->transactions()->create([
-                'amount' => $amount,
+            $wallet = self::lockForUpdate()->find($this->id);
+            if (!$wallet) {
+                throw new Exception('Wallet not found or could not be locked.');
+            }
+
+            $scale = config('virtualcoin.bcmath_scale', 4);
+            $balanceBefore = $wallet->balance; // Eloquent will cast this based on $casts
+
+            // Ensure amounts are strings for BCMath
+            $amountStr = (string) $amount;
+            $balanceBeforeStr = (string) $balanceBefore;
+
+            $newBalance = bcadd($balanceBeforeStr, $amountStr, $scale);
+
+            if (bccomp($newBalance, '0', $scale) < 0) {
+                throw new \IJIDeals\VirtualCoin\Exceptions\InsufficientBalanceException('Insufficient balance for this transaction.');
+            }
+
+            $transaction = $wallet->transactions()->create([
+                'amount' => $amount, // Stored as per its own cast (decimal:2)
                 'type' => $type,
-                'status' => $status, // Use provided status
+                'status' => $finalStatus,
                 'reference' => $reference ?: Str::uuid()->toString(),
                 'description' => $description,
                 'metadata' => $metadata,
-                'balance_before' => $balanceBefore,
-                'balance_after' => $newBalance, // Set balance_after based on calculation
+                'balance_before' => $balanceBefore, // Stored as per wallet cast (decimal:4)
+                'balance_after' => $newBalance,   // Stored as per wallet cast (decimal:4)
             ]);
 
             // Update wallet balance
-            $this->balance = $newBalance;
-            $this->save();
+            $wallet->balance = $newBalance; // Assign the string result from bcadd, Eloquent handles casting to DB
+            $wallet->save();
 
-            // If status was pending and needs to be completed by an external event,
-            // this logic would be different. For now, direct completion or pending status is fine.
+            // Dispatch an event
+            event(new \IJIDeals\VirtualCoin\Events\VirtualCoinTransactionCreated($transaction));
 
             return $transaction;
         });

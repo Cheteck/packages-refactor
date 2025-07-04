@@ -15,33 +15,23 @@ return [
     // Typically, virtual coins might not need many decimal places, but adjust as needed.
     'balance_precision' => 2, // Number of decimal places for balance storage/display
 
-    // Transaction types
-    // You can define a list of recognized transaction types here if you want to validate against them
-    // or use them for display purposes.
-    'transaction_types' => [
-        'deposit_purchase' => 'Deposit (Purchase)',
-        'deposit_bonus' => 'Deposit (Bonus)',
-        'spend_item' => 'Spend (Item Purchase)',
-        'spend_service' => 'Spend (Service Fee)',
-        'spend_sponsorship_funding' => 'Spend (Sponsorship Funding)',
-        'spend_sponsorship_impression' => 'Spend (Sponsorship Impression Cost)',
-        'spend_sponsorship_click' => 'Spend (Sponsorship Click Cost)',
-        'earn_reward_activity' => 'Earn (Activity Reward)',
-        'earn_referral_bonus' => 'Earn (Referral Bonus)',
-        'refund_item' => 'Refund (Item Return)',
-        'refund_sponsorship' => 'Refund (Sponsorship Cancellation)',
-        'withdrawal_cash_out' => 'Withdrawal (Cash Out)', // If converting virtual to real currency
-        'adjustment_credit' => 'Adjustment (Credit by Admin)',
-        'adjustment_debit' => 'Adjustment (Debit by Admin)',
-        'other' => 'Other Transaction',
-    ],
+    // Transaction types are now managed by IJIDeals\VirtualCoin\Enums\TransactionType Enum.
+    // The Enum provides labels and validation. This section can be removed or kept for documentation.
+    // 'transaction_types' => [
+    //     'deposit_purchase' => 'Deposit (Purchase)',
+    //     // ... (other types as previously defined) ...
+    //     'other' => 'Other Transaction',
+    // ],
 
     // Default status for new transactions if not specified.
     // Options: 'pending', 'completed', 'failed', 'cancelled'
+    // Consider using an Enum for statuses as well if they become more complex.
     'default_transaction_status' => 'completed',
 
-    // Settings for the HasVirtualWallet trait
-    'user_model' => \App\Models\User::class, // TODO: Change to IJIDeals\UserManagement\Models\User after confirmation
+    // Settings for the HasVirtualWallet trait and other parts of the package
+    // It's recommended to use the User model defined by the UserManagement package,
+    // or fallback to the application's default User model if UserManagement is not used.
+    'user_model' => config('user-management.user_model', config('auth.providers.users.model', \App\Models\User::class)),
 
     /*
     |--------------------------------------------------------------------------
@@ -50,6 +40,25 @@ return [
     | If you plan to use the 'reference' field for idempotency, you might add
     | settings related to how long a reference is considered "active" for checks.
     */
-    // 'idempotency_window_minutes' => 1440, // 24 hours example
+    'idempotency_enabled' => true, // Set to false to disable idempotency checks
+    'idempotency_window_minutes' => 1440, // 24 hours (1 day)
+
+    // Scale for BCMath operations. This should be at least the number of decimal places
+    // you intend to store and operate with precisely.
+    'bcmath_scale' => 4,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transaction Statuses
+    |--------------------------------------------------------------------------
+    | Consider using an Enum for these as well for consistency if they grow.
+    */
+    'statuses' => [
+        'pending' => 'pending',
+        'completed' => 'completed',
+        'failed' => 'failed',
+        'cancelled' => 'cancelled',
+        'refunded' => 'refunded', // If applicable
+    ],
 
 ];

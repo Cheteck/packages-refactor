@@ -37,9 +37,10 @@ trait HasVirtualWallet
     /**
      * Get the user's virtual coin balance.
      */
-    public function getCoinBalance(): float
+    public function getCoinBalance(): string
     {
-        return (float) $this->getWallet()->balance;
+        // Return as string to maintain precision from the database
+        return (string) $this->getWallet()->balance;
     }
 
     /**
@@ -55,23 +56,24 @@ trait HasVirtualWallet
      */
     public function depositCoins(
         float $amount,
-        string $type = 'deposit',
+        string|\IJIDeals\VirtualCoin\Enums\TransactionType $type = \IJIDeals\VirtualCoin\Enums\TransactionType::DEPOSIT_BONUS, // Default to a safe type or require explicit
         array $metadata = [],
         ?string $description = null,
         ?string $reference = null
     ): CoinTransaction {
         if ($amount <= 0) {
-            throw new Exception('Deposit amount must be positive.');
+            throw new \InvalidArgumentException('Deposit amount must be positive.');
         }
+        $transactionType = $type instanceof \IJIDeals\VirtualCoin\Enums\TransactionType ? $type->value : $type;
 
-        return $this->getWallet()->createTransaction($amount, $type, $metadata, $description, $reference, 'completed');
+        return $this->getWallet()->createTransaction($amount, $transactionType, $metadata, $description, $reference, config('virtualcoin.default_transaction_status', 'completed'));
     }
 
     /**
      * Withdraw/spend virtual coins from the user's wallet.
      *
      * @param  float  $amount  The amount to withdraw (must be positive).
-     * @param  string  $type  The type of transaction (e.g., 'spend_item', 'withdrawal_cash_out').
+     * @param  string|\IJIDeals\VirtualCoin\Enums\TransactionType  $type  The type of transaction (e.g., 'spend_item', 'withdrawal_cash_out').
      * @param  array  $metadata  Optional metadata.
      * @param  string|null  $description  Optional description.
      * @param  string|null  $reference  Optional unique reference.
@@ -80,17 +82,18 @@ trait HasVirtualWallet
      */
     public function withdrawCoins(
         float $amount,
-        string $type = 'spend',
+        string|\IJIDeals\VirtualCoin\Enums\TransactionType $type = \IJIDeals\VirtualCoin\Enums\TransactionType::SPEND_ITEM, // Default to a safe type or require explicit
         array $metadata = [],
         ?string $description = null,
         ?string $reference = null
     ): CoinTransaction {
         if ($amount <= 0) {
-            throw new Exception('Withdrawal amount must be positive.');
+            throw new \InvalidArgumentException('Withdrawal amount must be positive.');
         }
+        $transactionType = $type instanceof \IJIDeals\VirtualCoin\Enums\TransactionType ? $type->value : $type;
 
         // The createTransaction method in VirtualCoin model handles balance check.
-        return $this->getWallet()->createTransaction(-$amount, $type, $metadata, $description, $reference, 'completed');
+        return $this->getWallet()->createTransaction(-$amount, $transactionType, $metadata, $description, $reference, config('virtualcoin.default_transaction_status', 'completed'));
     }
 
     /**
@@ -98,11 +101,21 @@ trait HasVirtualWallet
      */
     public function hasSufficientCoinBalance(float $amount): bool
     {
-        if ($amount < 0) {
-            $amount = 0;
-        } // Cannot check for negative balance requirement
+        $scale = config('virtualcoin.bcmath_scale', 4);
+        $amountStr = (string) $amount;
 
-        return $this->getCoinBalance() >= $amount;
+        if (bccomp($amountStr, '0', $scale) < 0) {
+            // Cannot check for a negative requirement, or interpret as needing 0 if negative passed.
+            // Depending on desired logic, either throw an exception or treat as 0.
+            // For now, let's assume a non-negative amount is expected for this check.
+            // If $amount is indeed to check if balance is >= $amount (even if $amount is negative),
+            // then the logic is fine, but it's an unusual use case.
+            // Let's ensure $amountStr for comparison is not negative.
+             $amountStr = '0'; // Or throw InvalidArgumentException
+        }
+        // bccomp returns 0 if equal, 1 if left is greater, -1 if right is greater.
+        // We want getCoinBalance() >= amountStr  => bccomp(getCoinBalance(), amountStr) >= 0
+        return bccomp($this->getCoinBalance(), $amountStr, $scale) >= 0;
     }
 
     /**

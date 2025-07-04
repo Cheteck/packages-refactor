@@ -18,10 +18,10 @@ class VirtualCoinServiceProvider extends ServiceProvider
             __DIR__.'/../../config/virtualcoin.php', 'virtualcoin'
         );
 
-        // Example: If you create a VirtualCoinService
-        // $this->app->singleton(VirtualCoinService::class, function ($app) {
-        //     return new VirtualCoinService();
-        // });
+        $this->app->singleton(\IJIDeals\VirtualCoin\Services\WalletService::class, function ($app) {
+            return new \IJIDeals\VirtualCoin\Services\WalletService();
+        });
+        $this->app->alias(\IJIDeals\VirtualCoin\Services\WalletService::class, 'virtualcoin.wallet');
     }
 
     /**
@@ -29,24 +29,32 @@ class VirtualCoinServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (! file_exists(config_path('virtualcoin.php'))) {
-            $this->publishes([
-                __DIR__.'/../../config/virtualcoin.php' => config_path('virtualcoin.php'),
-            ], 'config');
-        }
-
-        $this->loadMigrationsFrom(__DIR__.'/../Database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations'); // Corrected path
 
         if ($this->app->runningInConsole()) {
-            // Publishing config is often done here as well, to allow users to customize after initial setup.
-            // This makes it appear with `vendor:publish`
             $this->publishes([
                 __DIR__.'/../../config/virtualcoin.php' => config_path('virtualcoin.php'),
-            ], 'config'); // Using the generic 'config' tag is common.
+            ], 'virtualcoin-config'); // More specific tag
 
             $this->publishes([
-                __DIR__.'/../Database/migrations/' => database_path('migrations'),
-            ], 'migrations'); // Using the generic 'migrations' tag.
+                __DIR__.'/../../database/migrations/' => database_path('migrations'),
+            ], 'virtualcoin-migrations'); // More specific tag
+        }
+
+        // Define a Gate for balance adjustments if it doesn't exist
+        // This is a basic example; your application might have a more sophisticated permission system.
+        // Ensure Gate facade is imported: use Illuminate\Support\Facades\Gate;
+        if (!\Illuminate\Support\Facades\Gate::has('adjust-virtual-coin-balance')) {
+            \Illuminate\Support\Facades\Gate::define('adjust-virtual-coin-balance', function ($user, $targetWallet = null) {
+                // Example: Only users with a specific role (e.g., 'super-admin') can adjust any balance.
+                // Or, a user might be able to adjust specific wallets they manage (not typical for virtual coins).
+                // Replace with your actual permission logic.
+                // Ensure $user is an instance of your User model.
+                if (!$user || !method_exists($user, 'hasRole')) {
+                    return false;
+                }
+                return $user->hasRole('super-admin'); // Ensure your User model has a hasRole method
+            });
         }
     }
 }

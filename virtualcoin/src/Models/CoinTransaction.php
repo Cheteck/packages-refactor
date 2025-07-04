@@ -109,14 +109,7 @@ class CoinTransaction extends Model
 
     public function getTypeLabel(): string
     {
-        return match ($this->type) {
-            'deposit' => 'Dépôt',
-            'withdrawal' => 'Retrait',
-            'spend' => 'Dépense',
-            'refund' => 'Remboursement',
-            'bonus' => 'Bonus',
-            default => ucfirst($this->type),
-        };
+        return \IJIDeals\VirtualCoin\Enums\TransactionType::tryFrom($this->type)?->label() ?? ucfirst($this->type);
     }
 
     public function getStatusLabel(): string
