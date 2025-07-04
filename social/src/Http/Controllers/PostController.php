@@ -2,9 +2,13 @@
 
 namespace IJIDeals\Social\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Controller; // Assuming base controller is in App\Http\Controllers
 use IJIDeals\Social\Http\Requests\StorePostRequest;
 use IJIDeals\Social\Http\Requests\UpdatePostRequest;
+use IJIDeals\IJIProductCatalog\Models\MasterProduct; // Added
+use IJIDeals\IJIShopListings\Models\ShopProduct; // Added
+use Illuminate\Support\Facades\Validator; // Added
+use Illuminate\Validation\ValidationException; // Added
 use IJIDeals\Social\Http\Resources\PostResource;
 // Will be created later
 use IJIDeals\Social\Models\Post;
@@ -135,9 +139,35 @@ class PostController extends Controller
     public function store(StorePostRequest $request)
     {
         Gate::authorize('create', Post::class);
-        $post = Post::create(array_merge($request->validated(), ['user_id' => auth()->id()]));
 
-        return new PostResource($post);
+        $validatedData = $request->validated();
+        $taggedProductsData = $this->validateAndPrepareTaggedProducts($validatedData['tagged_products'] ?? []);
+
+        // Default 'author_type' and 'author_id' if not provided (e.g. for user posts)
+        // For a system where other entities (like Shops) can post, this needs to be more robust.
+        // Assuming auth()->id() is the author_id and User::class is the author_type for now.
+        // This should ideally come from the request or be set by a service based on context.
+        $author = auth()->user();
+        $postData = array_merge($validatedData, [
+            'author_id' => $author->id,
+            'author_type' => get_class($author) // Or User::class if you have a specific user model
+        ]);
+
+        // Remove tagged_products from postData as it's handled by relation
+        unset($postData['tagged_products']);
+
+        $post = Post::create($postData);
+
+        if (!empty($taggedProductsData)) {
+            $post->taggedProducts()->sync($taggedProductsData);
+        }
+
+        // Manually trigger 'created' events if `create()` doesn't due to fillable or other reasons
+        // $post->wasRecentlyCreated = true; // Ensure events fire if not already
+        // event(new \Illuminate\Database\Events\ModelCreated($post));
+
+
+        return new PostResource($post->load('taggedProducts'));
     }
 
     /**
@@ -341,9 +371,29 @@ class PostController extends Controller
     public function update(UpdatePostRequest $request, Post $post)
     {
         Gate::authorize('update', $post);
-        $post->update($request->validated());
 
-        return new PostResource($post);
+        $validatedData = $request->validated();
+        $taggedProductsData = [];
+
+        if (isset($validatedData['tagged_products'])) {
+            $taggedProductsData = $this->validateAndPrepareTaggedProducts($validatedData['tagged_products']);
+        }
+
+        // Remove tagged_products from validatedData before updating the post model
+        unset($validatedData['tagged_products']);
+
+        $post->update($validatedData);
+
+        // Sync tagged products only if the key was present in the request
+        if ($request->has('tagged_products')) {
+            $post->taggedProducts()->sync($taggedProductsData);
+        }
+
+        // Manually trigger 'updated' events if `update()` doesn't
+        // event(new \Illuminate\Database\Events\ModelUpdated($post));
+
+
+        return new PostResource($post->load('taggedProducts'));
     }
 
     /**
@@ -406,5 +456,56 @@ class PostController extends Controller
         $post->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Validate and prepare tagged products data for syncing.
+     *
+     * @param array $taggedProductsInput
+     * @return array
+     * @throws ValidationException
+     */
+    private function validateAndPrepareTaggedProducts(array $taggedProductsInput): array
+    {
+        if (empty($taggedProductsInput)) {
+            return [];
+        }
+
+        $preparedData = [];
+        $errors = [];
+
+        foreach ($taggedProductsInput as $index => $productTag) {
+            $validator = Validator::make($productTag, [
+                'id' => 'required|integer|min:1',
+                'type' => 'required|string|in:MasterProduct,ShopProduct',
+            ]);
+
+            if ($validator->fails()) {
+                $errors["tagged_products.{$index}"] = $validator->errors()->all();
+                continue;
+            }
+
+            $modelClass = null;
+            if ($productTag['type'] === 'MasterProduct') {
+                $modelClass = MasterProduct::class;
+            } elseif ($productTag['type'] === 'ShopProduct') {
+                $modelClass = ShopProduct::class;
+            }
+
+            if (!$modelClass || !app($modelClass)->find($productTag['id'])) {
+                $errors["tagged_products.{$index}.id"] = "The selected {$productTag['type']} with ID {$productTag['id']} is invalid.";
+                continue;
+            }
+
+            // The key for sync should be the ID of the product.
+            // The value should be an array of pivot attributes.
+            $preparedData[$productTag['id']] = ['taggable_type' => $modelClass];
+        }
+
+        if (!empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $preparedData;
     }
 }

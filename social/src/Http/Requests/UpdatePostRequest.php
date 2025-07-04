@@ -23,10 +23,14 @@ class UpdatePostRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'contenu' => 'sometimes|string',
-            'type' => 'sometimes|string|in:texte,image,vidéo,lien',
-            'visibilite' => 'sometimes|string|in:public,amis,prive',
-            'statut' => 'sometimes|string|in:publie,brouillon,archive', // Added for updates
+            'content' => 'sometimes|string|max:5000', // Changed 'contenu' to 'content' and added max
+            'type' => 'sometimes|string|in:text,image,video,link,product', // Standardized, added product
+            'visibility' => 'sometimes|string|in:public,followers,private', // Standardized 'amis' to 'followers'
+            'status' => 'sometimes|string|in:published,draft,archived', // Standardized
+
+            'tagged_products' => 'nullable|array',
+            'tagged_products.*.id' => 'required_with:tagged_products|integer|min:1',
+            'tagged_products.*.type' => 'required_with:tagged_products|string|in:MasterProduct,ShopProduct',
         ];
     }
 }

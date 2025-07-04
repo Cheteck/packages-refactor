@@ -26,12 +26,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany; // Added this import
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Annotations as OA;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia; // Import OpenApi namespace
+
+// It's good practice to import the models you'll be relating to,
+// even if they are in different packages. This helps with static analysis and clarity.
+// Assuming these are the correct namespaces based on the project structure.
+// Not importing them here directly in Post.php as they are not directly used in THIS file,
+// but the relation definition implies their existence elsewhere.
+// use IJIDeals\IJIProductCatalog\Models\MasterProduct;
+// use IJIDeals\IJIShopListings\Models\ShopProduct;
+
 
 /**
  * @OA\Schema(
@@ -302,7 +312,10 @@ class Post extends Model implements HasMedia
         'comment_settings',
         'reaction_settings',
         'engagement_score',
-        'product_id',
+        'product_id', // This existing product_id might be for a single primary product link.
+                       // The new taggedProducts relation allows for multiple, potentially mixed-type product tags.
+                       // We need to consider how this existing field interacts with the new relation.
+                       // For now, we'll leave it, but it might become redundant or serve a different purpose.
         'is_published',
         'poll_id',
         'reach_estimate_id',
@@ -430,12 +443,28 @@ class Post extends Model implements HasMedia
     }
 
     /**
-     * Relation avec le produit associé
+     * Relation avec le produit associé (ancienne relation, potentiellement pour un lien produit principal)
      */
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class); // Now uses imported App\Models\Product
     }
+
+    /**
+     * Get all of the products that are tagged to this post.
+     * This defines the relationship structure for syncing and basic querying.
+     * Retrieving a mixed collection of actual MasterProduct and ShopProduct instances
+     * will require specific handling in API resources or services.
+     */
+    public function taggedProducts(): MorphToMany
+    {
+        // Using Model::class as a placeholder for the related model type in the signature
+        // because it can be MasterProduct or ShopProduct.
+        // The actual model class will be determined by the 'taggable_type' column in the pivot table.
+        return $this->morphToMany(Model::class, 'taggable', 'taggable_products', 'post_id', 'taggable_id')
+                    ->withTimestamps();
+    }
+
 
     /**
      * Relation avec les relations polymorphes
